@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#0d2a4a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Marathon Members</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -13,7 +17,7 @@
 <style>
 :root{
   --bg:#f4f5f8; --card:#fff; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb;
-  --brand:#0f172a; --accent:#f97316; --accent2:#fff7ed; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
+  --brand:#0d2a4a; --accent:#f97316; --accent2:#fff7ed; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
   --r:14px; --sh:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.05);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -23,7 +27,7 @@ a{color:inherit}
 a.btn{text-decoration:none}
 .hidden{display:none!important}
 header.top{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;padding:12px 16px calc(12px) ;display:flex;align-items:center;gap:10px}
-.logo{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:-.5px}
+.logo{width:36px;height:36px;border-radius:10px;background:#fff url(icon-192.png) center/cover no-repeat;flex:none;font-size:0}
 header .t1{font-weight:700;font-size:16px;line-height:1.1}
 header .t2{font-size:12px;opacity:.7}
 header .sp{flex:1}
@@ -98,7 +102,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:1
 .mcard .n{font-size:22px;font-weight:800}
 .qrbox{display:flex;justify-content:center;padding:10px;background:#fff;border-radius:12px}
 .login{max-width:380px;margin:9vh auto 0;text-align:center}
-.login .logo{width:64px;height:64px;font-size:26px;border-radius:18px;margin:0 auto 14px;color:#fff}
+.login .logo{width:84px;height:84px;border-radius:22px;margin:0 auto 14px;box-shadow:var(--sh)}
 .mission{border-left:4px solid var(--accent)}
 .mission.Training{border-left-color:#2563eb}.mission.Follow-up{border-left-color:#7c3aed}
 .tag{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
