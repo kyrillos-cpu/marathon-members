@@ -491,9 +491,11 @@ function importDlg(){
 }
 async function doImport(b){
   const teams=S.teams.map(t=>t.Name.toLowerCase());
-  const rows = $('#imp').value.split('\n').map(l=>l.split(/\t|,|؛|;/).map(x=>x.trim())).filter(r=>r[0]).map(r=>{
-    const team = r.slice(2).filter(x=>teams.includes(x.toLowerCase())).map(x=>S.teams.find(t=>t.Name.toLowerCase()===x.toLowerCase()).Name).join(', ');
-    return {Name:r[0], Phone:r[1]||'', Teams:team};
+  const rows = $('#imp').value.split('\n').map(l=>l.split(l.includes('\t')?/\t/:/,|؛|;/).map(x=>x.trim())).filter(r=>r[0]).map(r=>{
+    const rest = r.slice(2).filter(Boolean);
+    const team = rest.filter(x=>teams.includes(x.toLowerCase())).map(x=>S.teams.find(t=>t.Name.toLowerCase()===x.toLowerCase()).Name).join(', ');
+    const notes = rest.filter(x=>!teams.includes(x.toLowerCase())).join(' · ');
+    return {Name:r[0], Phone:r[1]||'', Teams:team, Notes:notes};
   });
   if(!rows.length) return toast('Nothing to import','err');
   const r = await run(b, ()=>api('importMembers',{rows}));

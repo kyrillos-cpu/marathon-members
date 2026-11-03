@@ -237,7 +237,7 @@ function importMembers_(d) {
     const name = String(r.Name || '').trim(); if (!name) return;
     const pk = phoneKey_(r.Phone);
     if ((pk && seen[pk]) || seen['n:' + name.toLowerCase()]) { skipped++; return; }
-    saveMember_({ Name: name, Phone: r.Phone || '', Teams: r.Teams || '', Role: r.Role || 'Servant', Church: r.Church || '' });
+    saveMember_({ Name: name, Phone: r.Phone || '', Teams: r.Teams || '', Role: r.Role || 'Servant', Church: r.Church || '', Notes: r.Notes || '' });
     if (pk) seen[pk] = 1; seen['n:' + name.toLowerCase()] = 1; added++;
   });
   return { added, skipped };
