@@ -34,8 +34,8 @@ const DEFAULT_SETTINGS = {
   REQUIRED_TYPES: 'Sunday Meeting,Training',
   W_ATTENDANCE: '50', W_COMMITMENT: '20', W_PARTICIPATION: '30',
   TYPE_WEIGHT_SUNDAY: '1', TYPE_WEIGHT_TRAINING: '2', TYPE_WEIGHT_CARNIVAL: '2',
-  BOOKING_SHEET_ID: '', BOOKING_TAB: '',
-  BOOKING_CONFIRMED_VALUES: 'confirmed,agreement finalized,finalized,service completed,completed,done,تم الاتفاق,مؤكد,تم التأكيد,تم التنفيذ',
+  BOOKING_SHEET_ID: '1y5M1BQLA5QMegs22yBkJB1n1WIA5_KQo949K4HqQK1U', BOOKING_TAB: 'طلبات الحجز',
+  BOOKING_CONFIRMED_VALUES: 'تم التأكيد,تمت الخدمة,confirmed,agreement finalized,finalized,service completed,completed,done,تم الاتفاق,مؤكد,تم التأكيد,تم التنفيذ',
   BOOKING_COL_KEY: '', BOOKING_COL_EPARCHY: '', BOOKING_COL_TYPE: '', BOOKING_COL_DATE: '',
   BOOKING_COL_ENDDATE: '', BOOKING_COL_STATUS: '', BOOKING_COL_CONTACT: '', BOOKING_COL_PHONE: '',
   LAST_BOOKING_SYNC: ''
@@ -450,20 +450,40 @@ function syncBookings() {
     }
     return -1;
   };
+  // Marathon booking form: separate training / carnival date + place columns
+  const findCol = (must, avoid) => {
+    for (let i = 0; i < low.length; i++) {
+      if (used[i] || !low[i]) continue;
+      if (must.every(w => w.some(x => low[i].indexOf(x) >= 0)) && !avoid.some(x => low[i].indexOf(x) >= 0)) { used[i] = 1; return i; }
+    }
+    return -1;
+  };
+  const ALT = ['بديل', 'alt', 'عدد', 'count'];
+  const split = {
+    tDate:  findCol([['تدريب', 'training'], ['ميعاد', 'تاريخ', 'date']], ALT),
+    cDate:  findCol([['كرنفال', 'carnival'], ['ميعاد', 'تاريخ', 'date']], ALT),
+    tPlace: findCol([['تدريب', 'training'], ['مكان', 'place', 'location']], []),
+    cPlace: findCol([['كرنفال', 'carnival'], ['مكان', 'place', 'location']], []),
+    tCount: findCol([['خدام', 'servants'], ['عدد', 'count']], []),
+    cCount: findCol([['مخدوم', 'kids', 'أطفال'], ['عدد', 'count']], [])
+  };
+  const isSplit = split.tDate >= 0 || split.cDate >= 0;
   const col = {
     status:  pick(st.BOOKING_COL_STATUS,  ['status', 'الحالة', 'حالة']),
     key:     pick(st.BOOKING_COL_KEY,     ['id', 'booking id', 'request id', '#', 'كود', 'رقم الحجز', 'رقم الطلب'], true),
-    enddate: pick(st.BOOKING_COL_ENDDATE, ['end date', 'to date', 'until', 'إلى', 'الى', 'حتى', 'نهاية']),
-    date:    pick(st.BOOKING_COL_DATE,    ['confirmed date', 'final date', 'agreed date', 'التاريخ المؤكد', 'الميعاد المؤكد', 'start date', 'date', 'تاريخ', 'ميعاد', 'الميعاد']),
+    enddate: isSplit ? -1 : pick(st.BOOKING_COL_ENDDATE, ['end date', 'to date', 'until', 'إلى', 'الى', 'حتى', 'نهاية']),
+    date:    isSplit ? -1 : pick(st.BOOKING_COL_DATE, ['confirmed date', 'final date', 'agreed date', 'التاريخ المؤكد', 'الميعاد المؤكد', 'start date', 'date', 'تاريخ', 'ميعاد', 'الميعاد']),
     eparchy: pick(st.BOOKING_COL_EPARCHY, ['eparchy', 'diocese', 'إيبارشية', 'ايبارشية', 'إبارشية', 'ابارشية', 'church', 'كنيسة']),
     type:    pick(st.BOOKING_COL_TYPE,    ['activity type', 'mission type', 'type', 'نوع', 'النشاط']),
-    contact: pick(st.BOOKING_COL_CONTACT, ['responsible', 'contact', 'servant name', 'المسؤول', 'المسئول', 'الخادم', 'name', 'اسم']),
-    phone:   pick(st.BOOKING_COL_PHONE,   ['phone', 'mobile', 'whatsapp', 'موبايل', 'تليفون', 'هاتف', 'واتس'])
+    contact: pick(st.BOOKING_COL_CONTACT, ['responsible', 'contact', 'servant name', 'مسئول', 'مسؤول', 'المسؤول', 'المسئول', 'الخادم', 'name', 'اسم']),
+    phone:   pick(st.BOOKING_COL_PHONE,   ['phone', 'mobile', 'موبايل', 'تليفون', 'هاتف', 'whatsapp', 'واتس'])
   };
-  if (col.enddate < 0) col.enddate = pick('', ['to', 'end', 'إلى', 'الى'], true);
+  // stable row key: ID column, else the submission time column
+  let stampCol = -1;
+  if (col.key < 0) low.forEach((h, i) => { if (stampCol < 0 && /timestamp|طابع زمني|وقت التسجيل|submitted|created/.test(h)) stampCol = i; });
+  if (!isSplit && col.enddate < 0) col.enddate = pick('', ['to', 'end', 'إلى', 'الى'], true);
   if (col.status < 0) throw new Error('Could not find a Status column in the bookings sheet. Set "Status column" in Settings. Headers: ' + headers.join(' | '));
-  if (col.date < 0) throw new Error('Could not find a Date column in the bookings sheet. Set "Date column" in Settings. Headers: ' + headers.join(' | '));
-
+  if (!isSplit && col.date < 0) throw new Error('Could not find a Date column in the bookings sheet. Set "Date column" in Settings. Headers: ' + headers.join(' | '));
   const okVals = String(st.BOOKING_CONFIRMED_VALUES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   const isConfirmed = v => {
     v = String(v || '').trim().toLowerCase(); if (!v) return false;
@@ -498,39 +518,53 @@ function syncBookings() {
     const r = values[i];
     if (!r.some(c => String(c).trim())) continue;
     if (!isConfirmed(get(r, col.status))) continue;
-    found++;
     const eparchy = String(get(r, col.eparchy) || '').trim();
-    const type = mapType(get(r, col.type));
-    const date = fmtDate(get(r, col.date));
-    const endDate = col.enddate >= 0 ? fmtDate(get(r, col.enddate)) : '';
-    const rawKey = String(get(r, col.key) || '').trim();
-    const key = rawKey ? 'B-' + rawKey : 'R-' + [eparchy, type, date].join('|');
-    seen[key] = 1;
-
-    let mRow = missions.filter(m => m.obj.BookingKey === key)[0];
-    let missionId;
-    if (!mRow) {
-      const prev = bookingsRows.filter(b => b.obj.Key === key)[0];
-      if (prev && prev.obj.MissionID === 'DELETED') continue; // leader deleted it on purpose
-      const m = {
-        ID: nextId_('Missions', 'MS-', 3), Title: type + ' – ' + (eparchy || 'Eparchy'), Type: type, Eparchy: eparchy,
-        Date: date, EndDate: endDate, Location: eparchy, SlotsNeeded: '', Status: 'Open', Source: 'Booking',
-        BookingKey: key, Notes: 'Confirmed booking', CreatedAt: stamp
-      };
-      writeObj_('Missions', m);
-      missions.push({ row: sh_('Missions').getLastRow(), obj: m });
-      missionId = m.ID; created++;
+    const rawType = String(get(r, col.type) || '');
+    const stampV = stampCol >= 0 ? r[stampCol] : '';
+    const rawKey = String(get(r, col.key) || '').trim() ||
+      (stampV ? (Object.prototype.toString.call(stampV) === '[object Date]' ? String(stampV.getTime()) : String(stampV).trim()) : '');
+    const items = [];
+    if (isSplit) {
+      const wantT = /تدريب|train/i.test(rawType) || (!rawType && split.tDate >= 0);
+      const wantC = /كرنفال|carn/i.test(rawType) || (!rawType && split.cDate >= 0);
+      if (wantT && split.tDate >= 0 && String(get(r, split.tDate)).trim())
+        items.push({ type: 'Training', suffix: '|T', date: fmtDate(get(r, split.tDate)), place: String(get(r, split.tPlace) || ''), count: String(get(r, split.tCount) || '') });
+      if (wantC && split.cDate >= 0 && String(get(r, split.cDate)).trim())
+        items.push({ type: 'Carnival', suffix: '|C', date: fmtDate(get(r, split.cDate)), place: String(get(r, split.cPlace) || ''), count: String(get(r, split.cCount) || '') });
     } else {
-      missionId = mRow.obj.ID;
-      if (mRow.obj.Date !== date || mRow.obj.EndDate !== endDate || mRow.obj.Eparchy !== eparchy) {
-        Object.assign(mRow.obj, { Date: date, EndDate: endDate, Eparchy: eparchy });
-        writeObj_('Missions', mRow.obj, mRow.row); updated++;
-      }
+      items.push({ type: mapType(rawType), suffix: '', date: fmtDate(get(r, col.date)), endDate: col.enddate >= 0 ? fmtDate(get(r, col.enddate)) : '', place: '', count: '' });
     }
-    upsert_('Bookings', b => b.Key === key, {
-      Key: key, Eparchy: eparchy, Type: type, Date: date, EndDate: endDate,
-      Contact: String(get(r, col.contact) || ''), Phone: String(get(r, col.phone) || ''),
-      Status: String(get(r, col.status) || ''), MissionID: missionId, SyncedAt: stamp
+    items.forEach(it => {
+      found++;
+      const key = (rawKey ? 'B-' + rawKey : 'R-' + [eparchy, it.type, it.date].join('|')) + it.suffix;
+      const endDate = it.endDate || '';
+      const location = it.place ? (it.place + (eparchy ? ' – ' + eparchy : '')) : eparchy;
+      seen[key] = 1;
+      let mRow = missions.filter(m => m.obj.BookingKey === key)[0];
+      let missionId;
+      if (!mRow) {
+        const prev = bookingsRows.filter(b => b.obj.Key === key)[0];
+        if (prev && prev.obj.MissionID === 'DELETED') return; // leader deleted it on purpose
+        const m = {
+          ID: nextId_('Missions', 'MS-', 3), Title: it.type + ' – ' + (eparchy || 'Eparchy'), Type: it.type, Eparchy: eparchy,
+          Date: it.date, EndDate: endDate, Location: location, SlotsNeeded: '', Status: 'Open', Source: 'Booking',
+          BookingKey: key, Notes: 'Confirmed booking' + (it.count ? ' · expected: ' + it.count : ''), CreatedAt: stamp
+        };
+        writeObj_('Missions', m);
+        missions.push({ row: sh_('Missions').getLastRow(), obj: m });
+        missionId = m.ID; created++;
+      } else {
+        missionId = mRow.obj.ID;
+        if (mRow.obj.Date !== it.date || mRow.obj.EndDate !== endDate || mRow.obj.Eparchy !== eparchy) {
+          Object.assign(mRow.obj, { Date: it.date, EndDate: endDate, Eparchy: eparchy });
+          writeObj_('Missions', mRow.obj, mRow.row); updated++;
+        }
+      }
+      upsert_('Bookings', b => b.Key === key, {
+        Key: key, Eparchy: eparchy, Type: it.type, Date: it.date, EndDate: endDate,
+        Contact: String(get(r, col.contact) || ''), Phone: String(get(r, col.phone) || ''),
+        Status: String(get(r, col.status) || ''), MissionID: missionId, SyncedAt: stamp
+      });
     });
   }
   // bookings that are no longer confirmed
@@ -541,5 +575,7 @@ function syncBookings() {
   });
   setSetting_('LAST_BOOKING_SYNC', stamp);
   const detected = {}; Object.keys(col).forEach(k => detected[k] = col[k] >= 0 ? headers[col[k]] : '—');
+  if (isSplit) ['tDate', 'cDate', 'tPlace', 'cPlace'].forEach(k => detected[k] = split[k] >= 0 ? headers[split[k]] : '—');
+  delete detected.date; delete detected.enddate;
   return { found, created, updated, columns: detected, time: stamp };
 }
