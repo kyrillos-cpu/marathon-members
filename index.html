@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Marathon Members</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<script src="lib/qrcode.min.js"></script>
+<script src="lib/html5-qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f8; --card:#fff; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb;
+  --brand:#0f172a; --accent:#f97316; --accent2:#fff7ed; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
+  --r:14px; --sh:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.05);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:inherit}
+a.btn{text-decoration:none}
+.hidden{display:none!important}
+header.top{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;padding:12px 16px calc(12px) ;display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:10px;background:var(--accent);display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:-.5px}
+header .t1{font-weight:700;font-size:16px;line-height:1.1}
+header .t2{font-size:12px;opacity:.7}
+header .sp{flex:1}
+.iconbtn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-size:13px;font-weight:600}
+main{max-width:980px;margin:0 auto;padding:16px 14px 100px}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs button{flex:1;background:none;border:0;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);cursor:pointer;font-weight:600}
+nav.tabs button .ic{font-size:19px;line-height:1}
+nav.tabs button.on{color:var(--accent)}
+@media(min-width:900px){nav.tabs{top:0;bottom:auto;left:auto;right:16px;background:transparent;border:0;width:auto;gap:4px;padding:10px 0}nav.tabs button{flex:none;flex-direction:row;color:#cbd5e1;font-size:13px;padding:8px 10px;border-radius:10px}nav.tabs button.on{background:rgba(255,255,255,.12);color:#fff}header.top{padding-right:640px}main{padding-bottom:40px}}
+h2{font-size:20px;margin:4px 0 12px;letter-spacing:-.3px}
+h3{font-size:15px;margin:0 0 10px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:14px;margin-bottom:12px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,1fr)} .g4{grid-template-columns:repeat(2,1fr)}
+@media(min-width:700px){.g4{grid-template-columns:repeat(4,1fr)}.md2{grid-template-columns:1fr 1fr}}
+.kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.btn{border:0;border-radius:11px;padding:10px 14px;font-weight:600;cursor:pointer;background:var(--ink);color:#fff;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.accent{background:var(--accent)} .btn.ghost{background:#eef0f4;color:var(--ink)} .btn.danger{background:#fee2e2;color:var(--err)} .btn.ok{background:var(--ok)}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:9px} .btn.block{width:100%} .btn.big{padding:16px;font-size:17px;border-radius:14px}
+.btn:disabled{opacity:.5}
+input.in,select.in,textarea.in{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;outline:none}
+input.in:focus,select.in:focus,textarea.in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent2)}
+label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 11px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chk{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:6px 11px;font-size:13px;font-weight:600;cursor:pointer}
+.chk input{accent-color:var(--accent)}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;background:#eef0f4;color:#334155;white-space:nowrap}
+.list .it{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.list .it:last-child{border-bottom:0}
+.av{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;font-size:14px}
+.grow{flex:1;min-width:0}
+.nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:12.5px;color:var(--muted)}
+.score{font-weight:800;font-size:15px;text-align:right}
+.stars{color:#f59e0b;font-size:12px;letter-spacing:1px}
+.bar{height:8px;background:#eef0f4;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.empty{color:var(--muted);text-align:center;padding:24px 8px;font-size:14px}
+.pill{border:0;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.p-Present{background:#dcfce7;color:#166534}.p-Late{background:#fef3c7;color:#92400e}.p-Excused{background:#e0e7ff;color:#3730a3}
+.p-Signed{background:#e0f2fe;color:#075985}.p-Confirmed{background:#dcfce7;color:#166534}.p-Attended{background:#16a34a;color:#fff}.p-No-show{background:#fee2e2;color:#991b1b}.p-Waitlist{background:#fef3c7;color:#92400e}
+.t-Training{background:#dbeafe;color:#1e40af}.t-Carnival{background:#ffedd5;color:#9a3412}.t-Sunday{background:#cffafe;color:#155e75}.t-Follow-up{background:#ede9fe;color:#5b21b6}.t-Other{background:#eef0f4}
+.rate{display:inline-flex;gap:1px}.rate button{background:none;border:0;font-size:19px;cursor:pointer;padding:0 1px;color:#d1d5db;line-height:1}.rate button.on{color:#f59e0b}
+.search{position:relative}.search input{padding-left:36px}.search:before{content:"⌕";position:absolute;left:12px;top:8px;font-size:18px;color:var(--muted)}
+.seg{display:inline-flex;background:#e9ebf0;border-radius:11px;padding:3px}.seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font-weight:600;font-size:13px;cursor:pointer;color:var(--muted)}.seg button.on{background:#fff;color:var(--ink);box-shadow:var(--sh)}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fd .15s}
+.sheet{background:#fff;width:100%;max-width:620px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));animation:up .2s}
+@media(min-width:700px){.ov{align-items:center}.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.4}}@keyframes fd{from{opacity:0}}
+.sheet .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.x{background:#eef0f4;border:0;border-radius:99px;width:32px;height:32px;font-size:16px;cursor:pointer}
+#toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:80;background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;box-shadow:var(--sh);max-width:90vw;text-align:center}
+#toast.err{background:var(--err)}#toast.ok{background:var(--ok)}
+/* scanner */
+#scanner{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}
+#scanner .sh{color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px}
+#reader{width:100%;max-width:520px;margin:0 auto;flex:1}
+#reader video{object-fit:cover}
+#scanRes{margin:10px 14px calc(14px + env(safe-area-inset-bottom));padding:16px;border-radius:16px;background:#1e293b;color:#fff;text-align:center;font-weight:700;font-size:18px;min-height:64px;transition:background .2s}
+#scanRes.ok{background:var(--ok)}#scanRes.warn{background:var(--warn)}#scanRes.err{background:var(--err)}
+/* member card */
+.mcard{background:linear-gradient(160deg,#0f172a,#1e293b 60%,#7c2d12);color:#fff;border-radius:22px;padding:22px;text-align:center;max-width:360px;margin:0 auto}
+.mcard .qr{background:#fff;padding:12px;border-radius:14px;display:inline-block;margin:14px 0}
+.mcard .qr img,.mcard .qr canvas{display:block}
+.mcard .n{font-size:22px;font-weight:800}
+.qrbox{display:flex;justify-content:center;padding:10px;background:#fff;border-radius:12px}
+.login{max-width:380px;margin:9vh auto 0;text-align:center}
+.login .logo{width:64px;height:64px;font-size:26px;border-radius:18px;margin:0 auto 14px;color:#fff}
+.mission{border-left:4px solid var(--accent)}
+.mission.Training{border-left-color:#2563eb}.mission.Follow-up{border-left-color:#7c3aed}
+.tag{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mb0{margin-bottom:0}
+.right{text-align:right}.small{font-size:12px}.muted{color:var(--muted)}
+details summary{cursor:pointer;font-weight:600;padding:6px 0}
+.printgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.pcard{border:1.5px dashed #94a3b8;border-radius:14px;padding:12px;text-align:center;background:#fff;break-inside:avoid}
+.pcard .qrbox{padding:4px}
+@media print{header.top,nav.tabs,.noprint{display:none!important}main{padding:0;max-width:none}body{background:#fff}.printgrid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<header class="top" id="hdr">
+  <div class="logo">M</div>
+  <div><div class="t1" id="svcName">Marathon Members</div><div class="t2" id="hdrSub">Servants follow-up</div></div>
+  <div class="sp"></div>
+  <span id="netBadge" class="badge hidden" style="background:#fbbf24;color:#000"></span>
+  <button class="iconbtn hidden" id="refreshBtn" onclick="reload(true)">↻</button>
+</header>
+<main id="main"><div class="empty">Loading…</div></main>
+<nav class="tabs hidden" id="tabs"></nav>
+<div id="modalRoot"></div>
+<div id="toast" class="hidden"></div>
+<div id="scanner" class="hidden">
+  <div class="sh"><div class="grow"><div style="font-weight:700" id="scanTitle">Scan</div><div class="small" style="opacity:.7" id="scanCount"></div></div><button class="iconbtn" onclick="closeScanner()">Done</button></div>
+  <div id="reader"></div>
+  <div id="scanRes">Point the camera at a member QR</div>
+</div>
+
+<script>
+/* =================== CORE =================== */
+const API = (window.MM_CONFIG||{}).API_URL || '';
+const Q = new URLSearchParams(location.search);
+let CODE = localStorage.getItem('mm_code') || '';
+let S = null;                      // all data
+let V = {view:'dash', sessionId:null, mFilter:'', mTeam:'', mSort:'name', misTab:'up', absQ:''};
+let SC = {};                       // computed scores cache
+const SESSION_TYPES = ['Sunday Meeting','Training','Carnival','Other'];
+const MISSION_TYPES = ['Training','Carnival','Follow-up','Other'];
+const ROLES = ['Servant','Team Lead','Coordinator','Leader'];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const nowStr = () => { const d=new Date(); return `${todayStr()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+const split = s => String(s||'').split(',').map(x=>x.trim()).filter(Boolean);
+function fmtD(s, withDay=true){ if(!s) return ''; const d=new Date(s.slice(0,10)+'T00:00:00'); if(isNaN(d)) return s; return d.toLocaleDateString('en-GB', withDay?{weekday:'short',day:'numeric',month:'short',year:'numeric'}:{day:'numeric',month:'short'}); }
+function initials(n){ const p=String(n||'?').trim().split(/\s+/); return ((p[0]||'')[0]||'')+((p[1]||'')[0]||''); }
+function teamColor(n){ const t=(S&&S.teams||[]).find(t=>t.Name===n); return t&&t.Color || '#64748b'; }
+function memberColor(m){ return teamColor(split(m.Teams)[0]); }
+function waPhone(p){ let d=String(p||'').replace(/\D/g,''); if(d.startsWith('0')) d='20'+d.slice(1); else if(d.length===10) d='20'+d; return d; }
+function waLink(p, text){ return `https://wa.me/${waPhone(p)}?text=${encodeURIComponent(text)}`; }
+function baseUrl(){ return location.origin + location.pathname; }
+function cardUrl(id){ return baseUrl()+'?card='+encodeURIComponent(id); }
+function joinUrl(){ return baseUrl()+'?join=1'; }
+function typeCls(t){ return 't-'+(t==='Sunday Meeting'?'Sunday':(MISSION_TYPES.includes(t)||t==='Carnival'||t==='Training'?t:'Other')); }
+function stars(score){ if(score==null) return '<span class="sub">—</span>'; const n=Math.round(score/20*2)/2; let s=''; for(let i=1;i<=5;i++) s+= n>=i?'★':(n>=i-.5?'⯪':'☆'); return `<span class="stars">${s}</span>`; }
+function level(score){ if(score==null) return ['New','#94a3b8']; if(score>=85) return ['Star','#16a34a']; if(score>=70) return ['Active','#2563eb']; if(score>=50) return ['Average','#d97706']; return ['Needs follow-up','#dc2626']; }
+
+function toast(msg, type=''){ const t=$('#toast'); t.textContent=msg; t.className=type; clearTimeout(t._h); t._h=setTimeout(()=>t.className='hidden', 2600); }
+function modal(html){ $('#modalRoot').innerHTML = `<div class="ov" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`; }
+function closeModal(){ $('#modalRoot').innerHTML=''; }
+function mhead(title){ return `<div class="hd"><h3 class="mb0" style="font-size:18px">${title}</h3><button class="x" onclick="closeModal()">✕</button></div>`; }
+function formData(id){ const f=document.getElementById(id); const o={}; new FormData(f).forEach((v,k)=>{ o[k]= o[k]!==undefined ? o[k]+', '+v : v; }); return o; }
+function isNetErr(e){ return e instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(e&&e.message)); }
+
+async function api(action, data={}, admin=true){
+  if(!API || API.includes('PASTE_')) throw new Error('API URL is not set in config.js');
+  const res = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({action, data, code: admin?CODE:''})});
+  const j = await res.json();
+  if(!j.ok) throw new Error(j.error||'Error');
+  return j.data;
+}
+async function run(btn, fn){ const b = btn&&btn.tagName?btn:null; if(b){b.disabled=true; b._t=b.innerHTML; b.innerHTML='…';} try{ return await fn(); } catch(e){ toast(e.message,'err'); throw e; } finally{ if(b){b.disabled=false; b.innerHTML=b._t;} } }
+
+/* =================== QR =================== */
+function qrInto(el, text, size=180){ if(!el) return; el.innerHTML=''; new QRCode(el,{text, width:size, height:size, correctLevel:QRCode.CorrectLevel.M}); }
+function extractId(text){ const m=String(text||'').toUpperCase().match(/MM-\d+/); return m?m[0]:null; }
+function cardCanvas(m, svc){
+  const c=document.createElement('canvas'); c.width=720; c.height=980; const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,720,980); g.addColorStop(0,'#0f172a'); g.addColorStop(.6,'#1e293b'); g.addColorStop(1,'#7c2d12');
+  x.fillStyle=g; x.fillRect(0,0,720,980);
+  x.fillStyle='#f97316'; x.fillRect(0,0,720,12);
+  x.fillStyle='#fff'; x.textAlign='center';
+  x.font='700 30px Inter, sans-serif'; x.fillText((svc||'Marathon Members').toUpperCase(),360,80);
+  const tmp=document.createElement('div'); new QRCode(tmp,{text:cardUrl(m.ID),width:460,height:460,correctLevel:QRCode.CorrectLevel.M});
+  const qc=tmp.querySelector('canvas');
+  x.fillStyle='#fff'; roundRect(x,110,120,500,500,28); x.fill();
+  x.drawImage(qc,130,140,460,460);
+  x.fillStyle='#fff'; x.font='800 46px Inter, sans-serif'; wrapText(x, m.Name, 360, 700, 640, 54);
+  x.font='600 30px Inter, sans-serif'; x.fillStyle='#fdba74'; x.fillText(m.ID, 360, 820);
+  x.font='500 26px Inter, sans-serif'; x.fillStyle='#cbd5e1'; x.fillText(split(m.Teams).join(' • ')||'—', 360, 870);
+  x.font='500 20px Inter, sans-serif'; x.fillStyle='#94a3b8'; x.fillText('Show this QR at every meeting, training & carnival', 360, 940);
+  return c;
+}
+function roundRect(x,a,b,w,h,r){ x.beginPath(); x.moveTo(a+r,b); x.arcTo(a+w,b,a+w,b+h,r); x.arcTo(a+w,b+h,a,b+h,r); x.arcTo(a,b+h,a,b,r); x.arcTo(a,b,a+w,b,r); x.closePath(); }
+function wrapText(x,t,cx,y,maxW,lh){ const w=String(t).split(' '); let line='', lines=[]; w.forEach(word=>{ const tst=line?line+' '+word:word; if(x.measureText(tst).width>maxW && line){lines.push(line); line=word;} else line=tst; }); lines.push(line); lines.slice(0,2).forEach((l,i)=>x.fillText(l,cx,y+i*lh)); }
+async function saveCard(m, svc){
+  const c=cardCanvas(m, svc);
+  const blob = await new Promise(r=>c.toBlob(r,'image/png'));
+  const file = new File([blob], `${m.Name.replace(/\s+/g,'_')}_${m.ID}.png`, {type:'image/png'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title:m.Name}); return; }catch(e){ if(e.name==='AbortError') return; } }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=file.name; a.click();
+}
+
+/* =================== SCORES =================== */
+function num(v,d){ const n=Number(v); return isNaN(n)?d:n; }
+function computeScores(){
+  SC = {};
+  if(!S) return;
+  const st=S.settings||{}, t=todayStr();
+  const req = split(st.REQUIRED_TYPES||'Sunday Meeting,Training');
+  const tw = {'Sunday Meeting':num(st.TYPE_WEIGHT_SUNDAY,1),'Training':num(st.TYPE_WEIGHT_TRAINING,2),'Carnival':num(st.TYPE_WEIGHT_CARNIVAL,2),'Other':1};
+  const W = {a:num(st.W_ATTENDANCE,50), c:num(st.W_COMMITMENT,20), p:num(st.W_PARTICIPATION,30)};
+  const past = S.sessions.filter(s=>s.Date<=t).sort((a,b)=>a.Date<b.Date?1:-1);
+  const att = {}; S.attendance.forEach(a=>{ (att[a.MemberID]=att[a.MemberID]||{})[a.SessionID]=a; });
+  const missionSessions = {}; S.sessions.forEach(s=>{ if(s.MissionID) (missionSessions[s.MissionID]=missionSessions[s.MissionID]||[]).push(s.ID); });
+  const misById = {}; S.missions.forEach(m=>misById[m.ID]=m);
+  S.members.forEach(m=>{
+    const my = att[m.ID]||{};
+    const join = (m.JoinDate||'0000').slice(0,10);
+    let wSum=0, wGot=0, reqCount=0, reqPresent=0, ratings=[], extra=0, recentMiss=0, recentChecked=0;
+    past.forEach(s=>{
+      const a = my[s.ID];
+      if(a && a.Rating) ratings.push(Number(a.Rating));
+      if(req.includes(s.Type)){
+        if(s.Date < join) return;
+        if(a && a.Status==='Excused') return;
+        const w = tw[s.Type]||1; wSum+=w; reqCount++;
+        if(a){ wGot += w*(a.Status==='Late'?0.75:1); reqPresent++; }
+        if(recentChecked<3){ recentChecked++; if(!a) recentMiss++; }
+      } else if(a) extra++;
+    });
+    // mission commitment
+    let mSigned=0, mDone=0;
+    S.signups.filter(x=>x.MemberID===m.ID).forEach(sg=>{
+      const mi = misById[sg.MissionID]; if(!mi) return;
+      if((mi.EndDate||mi.Date) > t) return;
+      if(sg.Status==='Waitlist'||sg.Status==='Cancelled') return;
+      const sess = missionSessions[mi.ID]||[];
+      let done = sg.Status==='Attended' || sess.some(id=>my[id]);
+      let known = done || sg.Status==='No-show' || sess.length>0;
+      if(!known) return;
+      mSigned++; if(done) mDone++;
+    });
+    const A = wSum? wGot/wSum*100 : null;
+    const C = mSigned? mDone/mSigned*100 : null;
+    const P = ratings.length? ratings.reduce((a,b)=>a+b,0)/ratings.length/5*100 : null;
+    let tot=0, ww=0; if(A!=null){tot+=A*W.a; ww+=W.a;} if(C!=null){tot+=C*W.c; ww+=W.c;} if(P!=null){tot+=P*W.p; ww+=W.p;}
+    let score = ww? tot/ww : null;
+    if(score!=null) score = Math.min(100, score + Math.min(extra,5)); // small bonus for extra missions
+    SC[m.ID] = {score: score==null?null:Math.round(score), A, C, P, reqCount, reqPresent, extra, mSigned, mDone,
+      ratingAvg: ratings.length? (ratings.reduce((a,b)=>a+b,0)/ratings.length):null, ratingN:ratings.length,
+      totalAttended: Object.keys(my).length, followUp: m.Status!=='Inactive' && recentChecked>=3 && recentMiss>=3};
+  });
+}
+
+/* =================== OFFLINE QUEUE =================== */
+function getQ(){ try{return JSON.parse(localStorage.getItem('mm_queue')||'[]');}catch(e){return [];} }
+function setQ(q){ localStorage.setItem('mm_queue', JSON.stringify(q)); netBadge(); }
+function netBadge(){ const n=getQ().length, b=$('#netBadge'); if(!b) return; b.classList.toggle('hidden', !n); b.textContent = `${n} pending`; }
+let flushing=false;
+async function flushQ(){
+  const q=getQ(); if(!q.length||flushing||!CODE) return; flushing=true;
+  try{
+    const res = await api('checkinBatch',{items:q});
+    const left=[];
+    res.forEach((r,i)=>{
+      const it=q[i];
+      const loc=S&&S.attendance.find(a=>a.SessionID===it.SessionID&&a.MemberID===it.MemberID);
+      if(r.ok){ if(loc){ Object.assign(loc, r.record); delete loc._pending; } }
+      else if(/not found/i.test(r.error)){ if(S) S.attendance = S.attendance.filter(a=>a!==loc); }
+      else left.push(it);
+    });
+    setQ(left); if(res.length) toast(`Synced ${res.length-left.length} check-ins`,'ok'); computeScores(); render();
+  }catch(e){} finally{ flushing=false; }
+}
+window.addEventListener('online', flushQ);
+setInterval(flushQ, 20000);
+
+/* =================== BOOT =================== */
+async function boot(){
+  netBadge();
+  if(Q.get('card')) return viewCard(Q.get('card'));
+  if(Q.has('join')) return viewJoin();
+  if(!CODE) return viewLogin();
+  await reload();
+}
+async function reload(showToast){
+  try{
+    $('#main').innerHTML = S? $('#main').innerHTML : '<div class="empty">Loading data…</div>';
+    S = await api('bootstrap');
+    // keep pending offline check-ins visible
+    getQ().forEach(it=>{ if(!S.attendance.some(a=>a.SessionID===it.SessionID&&a.MemberID===it.MemberID)) S.attendance.push(Object.assign({Status:'Present',Rating:'',Note:''},it,{_pending:true})); });
+    $('#svcName').textContent = S.settings.SERVICE_NAME || 'Marathon Members';
+    document.title = S.settings.SERVICE_NAME || 'Marathon Members';
+    $('#tabs').classList.remove('hidden'); $('#refreshBtn').classList.remove('hidden');
+    computeScores(); render(); flushQ();
+    if(showToast) toast('Updated','ok');
+  }catch(e){
+    if(/Wrong access code/.test(e.message)){ localStorage.removeItem('mm_code'); CODE=''; return viewLogin('Wrong code'); }
+    if(!S) $('#main').innerHTML = `<div class="card empty">Could not load data.<br><b>${esc(e.message)}</b><br><br><button class="btn" onclick="reload()">Try again</button></div>`;
+    else toast(e.message,'err');
+  }
+}
+
+function viewLogin(err){
+  $('#tabs').classList.add('hidden');
+  $('#main').innerHTML = `<div class="login card">
+    <div class="logo">M</div>
+    <h2>Marathon Members</h2>
+    <p class="sub">Leaders area — enter the access code</p>
+    <form onsubmit="event.preventDefault();doLogin(this)">
+      <input class="in" type="password" name="code" placeholder="Access code" autocomplete="current-password" required style="text-align:center;font-size:17px">
+      ${err?`<div class="small" style="color:var(--err);margin-top:6px">${esc(err)}</div>`:''}
+      <button class="btn accent block big mt12">Enter</button>
+    </form>
+    <div class="mt16 sub">Are you a servant?</div>
+    <a class="btn ghost block mt8" href="?join=1">Sign up for a mission →</a>
+  </div>`;
+}
+async function doLogin(f){
+  const code=f.code.value.trim(); CODE=code;
+  const b=f.querySelector('button');
+  try{ await run(b, ()=>api('login')); localStorage.setItem('mm_code', code); await reload(); }
+  catch(e){ CODE=''; }
+}
+function logout(){ localStorage.removeItem('mm_code'); CODE=''; S=null; location.href=baseUrl(); }
+
+/* =================== NAV =================== */
+const TABS = [['dash','◎','Home'],['members','👥','Members'],['att','▣','Attendance'],['missions','⚑','Missions'],['teams','◈','Teams'],['settings','⚙','Settings']];
+function go(v, extra={}){ Object.assign(V, {view:v}, extra); render(); window.scrollTo(0,0); }
+function render(){
+  if(!S) return;
+  $('#tabs').innerHTML = TABS.map(([k,ic,l])=>`<button class="${(V.view===k||(V.view==='session'&&k==='att')||(V.view==='print'&&k==='members'))?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join('');
+  const f = {dash:vDash, members:vMembers, att:vAttendance, session:vSession, missions:vMissions, teams:vTeams, settings:vSettings, print:vPrint}[V.view] || vDash;
+  $('#main').innerHTML = f();
+  if(V.view==='print') document.querySelectorAll('[data-qr]').forEach(el=>qrInto(el, el.dataset.qr, 150));
+}
+
+/* =================== DASHBOARD =================== */
+function vDash(){
+  const t=todayStr(), month=t.slice(0,7);
+  const active = S.members.filter(m=>m.Status!=='Inactive');
+  const scored = active.map(m=>SC[m.ID]&&SC[m.ID].score).filter(x=>x!=null);
+  const avg = scored.length? Math.round(scored.reduce((a,b)=>a+b,0)/scored.length) : '—';
+  const monthSessions = S.sessions.filter(s=>s.Date.slice(0,7)===month).length;
+  const upcoming = S.missions.filter(m=>m.Status!=='Closed' && m.Status!=='Cancelled' && (m.EndDate||m.Date)>=t).sort((a,b)=>a.Date<b.Date?-1:1);
+  const lastSun = S.sessions.filter(s=>s.Type==='Sunday Meeting' && s.Date<=t).sort((a,b)=>a.Date<b.Date?1:-1)[0];
+  let lastSunHtml = '<div class="sub">No Sunday meeting recorded yet</div>';
+  if(lastSun){ const n=S.attendance.filter(a=>a.SessionID===lastSun.ID).length; const pct=active.length?Math.round(n/active.length*100):0;
+    lastSunHtml = `<div class="row between"><div><div class="nm">${fmtD(lastSun.Date)}</div><div class="sub">${n} of ${active.length} attended</div></div><div class="score" style="font-size:22px">${pct}%</div></div><div class="bar mt8"><i style="width:${pct}%"></i></div>`; }
+  const top = active.filter(m=>SC[m.ID]&&SC[m.ID].score!=null).sort((a,b)=>SC[b.ID].score-SC[a.ID].score).slice(0,10);
+  const fu = active.filter(m=>SC[m.ID]&&(SC[m.ID].followUp || (SC[m.ID].score!=null&&SC[m.ID].score<50&&SC[m.ID].reqCount>=3)));
+  const teamCounts = S.teams.map(tm=>({n:tm.Name,c:tm.Color,v:active.filter(m=>split(m.Teams).includes(tm.Name)).length}));
+  const maxT = Math.max(1,...teamCounts.map(x=>x.v));
+  return `
+  <h2>Welcome 👋</h2>
+  <div class="grid g4">
+    <div class="card kpi mb0"><div class="l">Active servants</div><div class="v">${active.length}</div></div>
+    <div class="card kpi mb0"><div class="l">Average score</div><div class="v">${avg}</div></div>
+    <div class="card kpi mb0"><div class="l">Sessions this month</div><div class="v">${monthSessions}</div></div>
+    <div class="card kpi mb0"><div class="l">Upcoming missions</div><div class="v">${upcoming.length}</div></div>
+  </div>
+  <div class="grid md2 mt12">
+    <div>
+      <div class="card"><h3>Quick check-in</h3>
+        <button class="btn accent block big" onclick="quickSession('Sunday Meeting')">▣ Sunday Meeting — scan now</button>
+        <div class="grid g2 mt8"><button class="btn ghost" onclick="quickSession('Training')">Training day</button><button class="btn ghost" onclick="quickSession('Carnival')">Carnival day</button></div>
+      </div>
+      <div class="card"><h3>Last Sunday meeting</h3>${lastSunHtml}</div>
+      <div class="card"><div class="row between"><h3>Upcoming missions</h3><button class="btn sm ghost" onclick="go('missions')">All</button></div>
+        ${upcoming.slice(0,4).map(missionRow).join('') || '<div class="sub">No upcoming missions</div>'}</div>
+    </div>
+    <div>
+      <div class="card"><h3>🏆 Top servants</h3><div class="list">
+        ${top.map((m,i)=>`<div class="it" onclick="openMember('${m.ID}')"><b style="width:20px;color:var(--muted)">${i+1}</b>${avatar(m)}<div class="grow"><div class="nm">${esc(m.Name)}</div><div class="sub">${esc(split(m.Teams).join(', '))}</div></div><div><div class="score">${SC[m.ID].score}</div>${stars(SC[m.ID].score)}</div></div>`).join('') || '<div class="empty">Scores appear after the first sessions</div>'}
+      </div></div>
+      <div class="card"><h3>⚠️ Needs follow-up <span class="badge">${fu.length}</span></h3><div class="list">
+        ${fu.slice(0,12).map(m=>`<div class="it">${avatar(m)}<div class="grow" onclick="openMember('${m.ID}')"><div class="nm">${esc(m.Name)}</div><div class="sub">${SC[m.ID].followUp?'Missed last 3 meetings':'Low score '+SC[m.ID].score}</div></div>${m.Phone?`<a class="btn sm ok" target="_blank" href="${waLink(m.Phone,`Hi ${m.Name.split(' ')[0]} 👋 we missed you at Marathon! Hope you're doing well 🙏`)}">WhatsApp</a>`:''}</div>`).join('') || '<div class="sub">Everyone is on track 🎉</div>'}
+      </div></div>
+      <div class="card"><h3>Teams</h3>
+        ${teamCounts.map(x=>`<div class="mt8"><div class="row between small"><b>${esc(x.n)}</b><span>${x.v}</span></div><div class="bar"><i style="width:${x.v/maxT*100}%;background:${x.c}"></i></div></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+async function quickSession(type){
+  const t=todayStr();
+  let s = S.sessions.find(x=>x.Type===type && x.Date===t);
+  if(!s){ s = await run(null, ()=>api('saveSession',{Type:type, Date:t, StartTime: type==='Sunday Meeting'?'':'' , Title:''})); S.sessions.push(s); }
+  go('session',{sessionId:s.ID}); openScanner();
+}
+
+/* =================== MEMBERS =================== */
+function avatar(m){ return `<div class="av" style="background:${memberColor(m)}">${esc(initials(m.Name).toUpperCase())}</div>`; }
+function vMembers(){
+  let list = S.members.slice();
+  const q=V.mFilter.toLowerCase();
+  if(q) list=list.filter(m=>(m.Name+' '+m.Phone+' '+m.ID+' '+m.Church).toLowerCase().includes(q));
+  if(V.mTeam==='__inactive') list=list.filter(m=>m.Status==='Inactive');
+  else { list=list.filter(m=>m.Status!=='Inactive'); if(V.mTeam) list=list.filter(m=>split(m.Teams).includes(V.mTeam)); }
+  if(V.mSort==='score') list.sort((a,b)=>((SC[b.ID]||{}).score??-1)-((SC[a.ID]||{}).score??-1));
+  else list.sort((a,b)=>a.Name.localeCompare(b.Name));
+  return `
+  <div class="row between"><h2>Members <span class="badge">${S.members.filter(m=>m.Status!=='Inactive').length}</span></h2>
+    <div class="row"><button class="btn ghost sm" onclick="importDlg()">Import</button><button class="btn ghost sm" onclick="go('print')">Print QR</button><button class="btn accent sm" onclick="memberForm()">+ Add</button></div></div>
+  <div class="search"><input class="in" placeholder="Search name, phone, ID…" value="${esc(V.mFilter)}" oninput="V.mFilter=this.value;clearTimeout(window._mf);window._mf=setTimeout(()=>{render();const i=document.querySelector('.search input');i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)"></div>
+  <div class="chips mt8" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px">
+    <button class="chip ${!V.mTeam?'on':''}" onclick="V.mTeam='';render()">All</button>
+    ${S.teams.map(t=>`<button class="chip ${V.mTeam===t.Name?'on':''}" onclick="V.mTeam='${esc(t.Name)}';render()">${esc(t.Name)}</button>`).join('')}
+    <button class="chip ${V.mTeam==='__inactive'?'on':''}" onclick="V.mTeam='__inactive';render()">Inactive</button>
+  </div>
+  <div class="row between mt8"><span class="sub">${list.length} shown</span><div class="seg"><button class="${V.mSort==='name'?'on':''}" onclick="V.mSort='name';render()">A–Z</button><button class="${V.mSort==='score'?'on':''}" onclick="V.mSort='score';render()">Score</button></div></div>
+  <div class="card list mt8">${list.map(m=>{ const s=SC[m.ID]||{}; return `<div class="it" onclick="openMember('${m.ID}')">${avatar(m)}<div class="grow"><div class="nm">${esc(m.Name)}</div><div class="sub">${esc(m.ID)} · ${esc(split(m.Teams).join(', ')||'No team')}</div></div><div><div class="score">${s.score??'—'}</div>${stars(s.score)}</div></div>`; }).join('') || '<div class="empty">No members yet — tap “+ Add” or “Import”.</div>'}</div>`;
+}
+function memberForm(id){
+  const m = S.members.find(x=>x.ID===id) || {Status:'Active', Role:'Servant', JoinDate:todayStr(), Teams:''};
+  const mt = split(m.Teams);
+  modal(`${mhead(id?'Edit member':'New member')}
+  <form id="mf" onsubmit="event.preventDefault();saveMember(this)">
+    <input type="hidden" name="ID" value="${esc(m.ID||'')}">
+    <label class="f">Full name *</label><input class="in" name="Name" required value="${esc(m.Name||'')}">
+    <label class="f">Mobile (WhatsApp)</label><input class="in" name="Phone" inputmode="tel" value="${esc(m.Phone||'')}" placeholder="01xxxxxxxxx">
+    <label class="f">Team(s)</label><div class="chips">${S.teams.map(t=>`<label class="chk"><input type="checkbox" name="Teams" value="${esc(t.Name)}" ${mt.includes(t.Name)?'checked':''}>${esc(t.Name)}</label>`).join('')}</div>
+    <div class="grid g2"><div><label class="f">Role</label><select class="in" name="Role">${ROLES.map(r=>`<option ${m.Role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+    <div><label class="f">Status</label><select class="in" name="Status">${['Active','Inactive'].map(r=>`<option ${m.Status===r?'selected':''}>${r}</option>`).join('')}</select></div></div>
+    <div class="grid g2"><div><label class="f">Church / Eparchy</label><input class="in" name="Church" value="${esc(m.Church||'')}"></div>
+    <div><label class="f">Joined on</label><input class="in" type="date" name="JoinDate" value="${esc((m.JoinDate||'').slice(0,10))}"></div></div>
+    <label class="f">Notes</label><textarea class="in" name="Notes" rows="2">${esc(m.Notes||'')}</textarea>
+    <button class="btn accent block big mt16">Save</button>
+  </form>`);
+}
+async function saveMember(f){
+  const d=formData('mf'); d.Teams=d.Teams||'';
+  const m = await run(f.querySelector('button'), ()=>api('saveMember', d));
+  const i=S.members.findIndex(x=>x.ID===m.ID); if(i>=0) S.members[i]=m; else S.members.push(m);
+  computeScores(); closeModal(); render(); toast('Saved ✓','ok');
+  if(!d.ID) openMember(m.ID);
+}
+function openMember(id){
+  const m=S.members.find(x=>x.ID===id); if(!m) return;
+  const s=SC[id]||{}; const [lv,lc]=level(s.score);
+  const hist = S.attendance.filter(a=>a.MemberID===id).map(a=>({a, s:S.sessions.find(x=>x.ID===a.SessionID)})).filter(x=>x.s).sort((x,y)=>x.s.Date<y.s.Date?1:-1);
+  const sg = S.signups.filter(x=>x.MemberID===id).map(x=>({x, m:S.missions.find(y=>y.ID===x.MissionID)})).filter(x=>x.m).sort((a,b)=>a.m.Date<b.m.Date?1:-1);
+  const pc = v => v==null?'—':Math.round(v)+'%';
+  modal(`${mhead(esc(m.Name))}
+  <div class="row"><span class="badge">${esc(m.ID)}</span><span class="badge" style="background:${lc};color:#fff">${lv}</span>${m.Status==='Inactive'?'<span class="badge">Inactive</span>':''}<span class="sub">${esc(m.Role||'')}</span></div>
+  <div class="grid g2 mt12">
+    <div class="qrbox" id="mqr"></div>
+    <div><div class="kpi"><div class="l">Score</div><div class="v">${s.score??'—'}</div>${stars(s.score)}</div>
+      <div class="small mt8">Attendance: <b>${pc(s.A)}</b> <span class="muted">(${s.reqPresent||0}/${s.reqCount||0})</span></div>
+      <div class="small">Mission commitment: <b>${pc(s.C)}</b> <span class="muted">(${s.mDone||0}/${s.mSigned||0})</span></div>
+      <div class="small">Participation: <b>${s.ratingAvg?s.ratingAvg.toFixed(1)+' / 5':'—'}</b></div>
+      <div class="small">Extra missions: <b>${s.extra||0}</b></div>
+    </div>
+  </div>
+  <div class="chips mt12">${split(m.Teams).map(t=>`<span class="badge" style="background:${teamColor(t)};color:#fff">${esc(t)}</span>`).join('')}</div>
+  <div class="sub mt8">${m.Phone?'📞 '+esc(m.Phone):''} ${m.Church?' · ⛪ '+esc(m.Church):''} ${m.JoinDate?' · Joined '+fmtD(m.JoinDate,false):''}</div>
+  ${m.Notes?`<div class="small mt8 muted">${esc(m.Notes)}</div>`:''}
+  <div class="grid g2 mt12">
+    <button class="btn ghost" onclick="saveCard(S.members.find(x=>x.ID==='${id}'), S.settings.SERVICE_NAME)">⬇ Card image</button>
+    ${m.Phone?`<a class="btn ok" target="_blank" href="${waLink(m.Phone,`Hi ${m.Name.split(' ')[0]} 👋\nThis is your Marathon member card. Show the QR at every meeting:\n${cardUrl(m.ID)}\n\nSign up for missions here:\n${joinUrl()}`)}">Send card on WhatsApp</a>`:'<span></span>'}
+  </div>
+  <h3 class="mt16">Attendance history</h3>
+  <div class="list">${hist.slice(0,15).map(({a,s})=>`<div class="it" style="cursor:default"><span class="badge ${typeCls(s.Type)}">${esc(s.Type)}</span><div class="grow small">${fmtD(s.Date)}</div><span class="pill p-${a.Status}">${a.Status}</span>${a.Rating?`<span class="stars">${'★'.repeat(a.Rating)}</span>`:''}</div>`).join('')||'<div class="sub">No attendance yet</div>'}</div>
+  <h3 class="mt16">Missions</h3>
+  <div class="list">${sg.map(({x,m:mi})=>`<div class="it" style="cursor:default"><span class="badge ${typeCls(mi.Type)}">${esc(mi.Type)}</span><div class="grow small"><b>${esc(mi.Title)}</b><br>${fmtD(mi.Date)}</div><span class="pill p-${x.Status}">${x.Status}</span></div>`).join('')||'<div class="sub">No missions yet</div>'}</div>
+  <div class="grid g2 mt16"><button class="btn" onclick="memberForm('${id}')">Edit</button><button class="btn danger" onclick="delMember('${id}')">Delete</button></div>`);
+  qrInto(document.getElementById('mqr'), cardUrl(id), 150);
+}
+async function delMember(id){
+  const m=S.members.find(x=>x.ID===id);
+  if(!confirm(`Delete ${m.Name} and all their attendance?\nTip: set Status = Inactive instead to keep history.`)) return;
+  await run(null, ()=>api('deleteMember',{ID:id}));
+  S.members=S.members.filter(x=>x.ID!==id); S.attendance=S.attendance.filter(a=>a.MemberID!==id); S.signups=S.signups.filter(a=>a.MemberID!==id);
+  computeScores(); closeModal(); render(); toast('Deleted');
+}
+function importDlg(){
+  modal(`${mhead('Import members')}
+  <p class="sub">Paste one member per line: <b>Name, Phone, Team</b> (phone and team are optional). You can copy columns straight from Excel/Sheets.</p>
+  <textarea class="in" id="imp" rows="9" placeholder="Mina Adel, 01012345678, Media&#10;Mariam Samy, 01198765432, Training"></textarea>
+  <button class="btn accent block big mt12" onclick="doImport(this)">Import</button>`);
+}
+async function doImport(b){
+  const teams=S.teams.map(t=>t.Name.toLowerCase());
+  const rows = $('#imp').value.split('\n').map(l=>l.split(/\t|,|؛|;/).map(x=>x.trim())).filter(r=>r[0]).map(r=>{
+    const team = r.slice(2).filter(x=>teams.includes(x.toLowerCase())).map(x=>S.teams.find(t=>t.Name.toLowerCase()===x.toLowerCase()).Name).join(', ');
+    return {Name:r[0], Phone:r[1]||'', Teams:team};
+  });
+  if(!rows.length) return toast('Nothing to import','err');
+  const r = await run(b, ()=>api('importMembers',{rows}));
+  closeModal(); toast(`Added ${r.added}, skipped ${r.skipped} duplicates`,'ok'); reload();
+}
+function vPrint(){
+  const list=S.members.filter(m=>m.Status!=='Inactive').sort((a,b)=>a.Name.localeCompare(b.Name));
+  return `<div class="row between noprint"><h2>QR cards</h2><div class="row"><button class="btn ghost sm" onclick="go('members')">Back</button><button class="btn accent sm" onclick="window.print()">Print</button></div></div>
+  <p class="sub noprint">Print, cut and give each servant their card — or send it on WhatsApp from their profile.</p>
+  <div class="printgrid">${list.map(m=>`<div class="pcard"><div class="small" style="font-weight:800;letter-spacing:.5px;color:var(--accent)">${esc((S.settings.SERVICE_NAME||'MARATHON').toUpperCase())}</div><div class="qrbox" data-qr="${esc(cardUrl(m.ID))}"></div><div style="font-weight:800">${esc(m.Name)}</div><div class="small muted">${esc(m.ID)} · ${esc(split(m.Teams).join(', '))}</div></div>`).join('')}</div>`;
+}
+
+/* =================== ATTENDANCE =================== */
+function vAttendance(){
+  const list=S.sessions.slice().sort((a,b)=>a.Date<b.Date?1:(a.Date>b.Date?-1:(a.ID<b.ID?1:-1)));
+  return `<div class="row between"><h2>Attendance</h2><button class="btn accent sm" onclick="sessionForm()">+ New session</button></div>
+  <div class="card list">${list.map(s=>{ const n=S.attendance.filter(a=>a.SessionID===s.ID).length; const mi=s.MissionID&&S.missions.find(m=>m.ID===s.MissionID);
+    return `<div class="it" onclick="go('session',{sessionId:'${s.ID}'})"><span class="badge ${typeCls(s.Type)}">${esc(s.Type)}</span><div class="grow"><div class="nm">${esc(s.Title||s.Type)}</div><div class="sub">${fmtD(s.Date)}${s.StartTime?' · '+esc(s.StartTime):''}${mi?' · ⚑ '+esc(mi.Title):''}</div></div><div class="score">${n}</div></div>`; }).join('') || '<div class="empty">No sessions yet. Create one, then scan QR codes.</div>'}</div>`;
+}
+function sessionForm(id, preset={}){
+  const s = S.sessions.find(x=>x.ID===id) || Object.assign({Type:'Sunday Meeting', Date:todayStr(), StartTime:''}, preset);
+  const ms = S.missions.slice().sort((a,b)=>a.Date<b.Date?1:-1);
+  modal(`${mhead(id?'Edit session':'New session')}
+  <form id="sf" onsubmit="event.preventDefault();saveSession(this)">
+    <input type="hidden" name="ID" value="${esc(s.ID||'')}">
+    <label class="f">Type</label><div class="chips">${SESSION_TYPES.map(t=>`<label class="chk"><input type="radio" name="Type" value="${t}" ${s.Type===t?'checked':''}>${t}</label>`).join('')}</div>
+    <div class="grid g2"><div><label class="f">Date</label><input class="in" type="date" name="Date" value="${esc(s.Date)}" required></div>
+    <div><label class="f">Start time (for “Late”)</label><input class="in" type="time" name="StartTime" value="${esc(s.StartTime||'')}"></div></div>
+    <label class="f">Title (optional)</label><input class="in" name="Title" value="${esc(s.Title||'')}" placeholder="e.g. Monthly training – Storytelling">
+    <label class="f">Linked mission (optional)</label><select class="in" name="MissionID"><option value="">— none —</option>${ms.map(m=>`<option value="${m.ID}" ${s.MissionID===m.ID?'selected':''}>${esc(m.Title)} · ${fmtD(m.Date,false)}</option>`).join('')}</select>
+    <label class="f">Notes</label><input class="in" name="Notes" value="${esc(s.Notes||'')}">
+    <button class="btn accent block big mt16">Save</button>
+  </form>`);
+}
+async function saveSession(f){
+  const d=formData('sf');
+  const s=await run(f.querySelector('button'), ()=>api('saveSession', d));
+  const i=S.sessions.findIndex(x=>x.ID===s.ID); if(i>=0) S.sessions[i]=s; else S.sessions.push(s);
+  closeModal(); computeScores(); go('session',{sessionId:s.ID});
+}
+function vSession(){
+  const s=S.sessions.find(x=>x.ID===V.sessionId); if(!s) return vAttendance();
+  const recs=S.attendance.filter(a=>a.SessionID===s.ID).sort((a,b)=>a.Time<b.Time?1:-1);
+  const present=new Set(recs.map(r=>r.MemberID));
+  const mi=s.MissionID&&S.missions.find(m=>m.ID===s.MissionID);
+  const signed = mi? new Set(S.signups.filter(x=>x.MissionID===mi.ID).map(x=>x.MemberID)) : new Set();
+  let absent=S.members.filter(m=>m.Status!=='Inactive' && !present.has(m.ID) && (!m.JoinDate||m.JoinDate.slice(0,10)<=s.Date));
+  if(V.absQ) absent=absent.filter(m=>(m.Name+' '+m.ID+' '+m.Phone).toLowerCase().includes(V.absQ.toLowerCase()));
+  absent.sort((a,b)=>(signed.has(b.ID)-signed.has(a.ID)) || a.Name.localeCompare(b.Name));
+  const active=S.members.filter(m=>m.Status!=='Inactive').length;
+  return `<div class="row"><button class="btn ghost sm" onclick="go('att')">← Back</button></div>
+  <div class="card mt8">
+    <div class="row between"><div><span class="badge ${typeCls(s.Type)}">${esc(s.Type)}</span><h2 class="mt8 mb0">${esc(s.Title||s.Type)}</h2><div class="sub">${fmtD(s.Date)}${s.StartTime?' · starts '+esc(s.StartTime):''}${mi?' · ⚑ '+esc(mi.Title):''}</div></div>
+    <div class="right"><div class="kpi"><div class="v">${recs.length}</div><div class="l">${mi?`of ${signed.size} signed`:`of ${active}`}</div></div></div></div>
+    <button class="btn accent block big mt12" onclick="openScanner()">📷 Scan QR codes</button>
+    <div class="row mt8"><button class="btn ghost sm" onclick="sessionForm('${s.ID}')">Edit</button><button class="btn ghost sm" onclick="copyNames('${s.ID}')">Copy names</button><button class="btn danger sm" onclick="delSession('${s.ID}')">Delete</button></div>
+  </div>
+  <div class="card"><h3>Present <span class="badge">${recs.length}</span> <span class="sub" style="font-weight:400">· tap status to change · rate participation</span></h3>
+  <div class="list">${recs.map(a=>{ const m=S.members.find(x=>x.ID===a.MemberID)||{Name:a.MemberID,ID:a.MemberID,Teams:''}; return `<div class="it" style="cursor:default">${avatar(m)}<div class="grow"><div class="nm">${esc(m.Name)} ${a._pending?'<span class="badge" style="background:#fef3c7">offline</span>':''}</div><div class="sub">${esc((a.Time||'').slice(11,16))} · ${esc(a.Method||'')}</div>
+    <div class="rate">${[1,2,3,4,5].map(n=>`<button class="${Number(a.Rating)>=n?'on':''}" onclick="rate('${s.ID}','${m.ID}',${n})">★</button>`).join('')}</div></div>
+    <div class="right"><button class="pill p-${a.Status}" onclick="cycleStatus('${s.ID}','${m.ID}')">${a.Status}</button><br><button class="btn sm ghost mt8" onclick="removeAtt('${s.ID}','${m.ID}')">✕</button></div></div>`; }).join('') || '<div class="empty">No one yet. Tap “Scan QR codes”.</div>'}</div></div>
+  <div class="card"><h3>Not checked in <span class="badge">${absent.length}</span></h3>
+    <div class="search"><input class="in" placeholder="Find a member to check in manually…" value="${esc(V.absQ)}" oninput="V.absQ=this.value;clearTimeout(window._af);window._af=setTimeout(()=>{render();const i=document.querySelectorAll('.search input');const e=i[i.length-1];e.focus();e.setSelectionRange(e.value.length,e.value.length)},250)"></div>
+    <div class="list mt8">${absent.map(m=>`<div class="it" style="cursor:default">${avatar(m)}<div class="grow"><div class="nm">${esc(m.Name)}</div><div class="sub">${signed.has(m.ID)?'<b style="color:var(--accent)">Signed up</b> · ':''}${esc(split(m.Teams).join(', '))}</div></div><button class="btn sm ghost" onclick="manualCheck('${s.ID}','${m.ID}','Excused')">Excused</button><button class="btn sm" onclick="manualCheck('${s.ID}','${m.ID}')">✓ In</button></div>`).join('') || '<div class="sub">Everyone is here 🎉</div>'}</div>
+  </div>`;
+}
+function localLate(s, time){ if(!s.StartTime||time.slice(0,10)!==s.Date) return 'Present'; const [h,mi]=s.StartTime.split(':').map(Number); const [th,tm]=time.slice(11,16).split(':').map(Number); return (th*60+tm) > (h*60+mi+num(S.settings.LATE_AFTER_MIN,15)) ? 'Late':'Present'; }
+function findMemberLocal(key){ const id=extractId(key); if(id) return S.members.find(m=>m.ID===id); const p=String(key).replace(/\D/g,'').slice(-10); return p.length>=9? S.members.find(m=>String(m.Phone).replace(/\D/g,'').slice(-10)===p):null; }
+async function doCheckin(sid, key, method='QR', status){
+  const s=S.sessions.find(x=>x.ID===sid); const m=findMemberLocal(key);
+  if(!m) return {type:'err', msg:'Unknown QR code'};
+  if(m.Status==='Inactive') return {type:'warn', msg:`${m.Name} is inactive`};
+  if(S.attendance.some(a=>a.SessionID===sid&&a.MemberID===m.ID)) return {type:'warn', msg:`${m.Name} — already checked in`};
+  const time=nowStr();
+  const rec={SessionID:sid, MemberID:m.ID, Time:time, Method:method, Status: status||localLate(s,time), Rating:'', Note:'', _pending:true};
+  S.attendance.push(rec);
+  api('checkin',{SessionID:sid, MemberID:m.ID, Time:time, Method:method, Status:status}).then(r=>{ Object.assign(rec, r.record); delete rec._pending; computeScores(); if(V.view==='session'&&$('#scanner').classList.contains('hidden')) render(); })
+    .catch(e=>{ if(isNetErr(e)){ const q=getQ(); q.push({SessionID:sid, MemberID:m.ID, Time:time, Method:method, Status:status}); setQ(q); if(V.view==='session') render(); } else { S.attendance=S.attendance.filter(a=>a!==rec); toast(e.message,'err'); render(); } });
+  computeScores();
+  return {type:'ok', msg:`✓ ${m.Name}${rec.Status==='Late'?' (Late)':''}`};
+}
+async function manualCheck(sid, mid, status){ const r=await doCheckin(sid, mid, 'Manual', status); toast(r.msg, r.type==='ok'?'ok':(r.type==='err'?'err':'')); render(); }
+async function rate(sid, mid, n){ const a=S.attendance.find(x=>x.SessionID===sid&&x.MemberID===mid); if(!a) return; a.Rating = Number(a.Rating)===n? '' : n; computeScores(); render(); try{ await api('setAttendance',{SessionID:sid, MemberID:mid, Rating:a.Rating}); }catch(e){ toast(e.message,'err'); } }
+async function cycleStatus(sid, mid){ const a=S.attendance.find(x=>x.SessionID===sid&&x.MemberID===mid); const order=['Present','Late','Excused']; a.Status=order[(order.indexOf(a.Status)+1)%3]; computeScores(); render(); try{ await api('setAttendance',{SessionID:sid, MemberID:mid, Status:a.Status}); }catch(e){ toast(e.message,'err'); } }
+async function removeAtt(sid, mid){ if(!confirm('Remove this check-in?')) return; S.attendance=S.attendance.filter(x=>!(x.SessionID===sid&&x.MemberID===mid)); setQ(getQ().filter(x=>!(x.SessionID===sid&&x.MemberID===mid))); computeScores(); render(); try{ await api('setAttendance',{SessionID:sid, MemberID:mid, remove:true}); }catch(e){ toast(e.message,'err'); } }
+async function delSession(id){ if(!confirm('Delete this session and its attendance?')) return; await run(null,()=>api('deleteSession',{ID:id})); S.sessions=S.sessions.filter(s=>s.ID!==id); S.attendance=S.attendance.filter(a=>a.SessionID!==id); computeScores(); go('att'); }
+function copyNames(sid){ const s=S.sessions.find(x=>x.ID===sid); const names=S.attendance.filter(a=>a.SessionID===sid).map(a=>(S.members.find(m=>m.ID===a.MemberID)||{}).Name).filter(Boolean); copyText(`${s.Title||s.Type} – ${fmtD(s.Date)}\nPresent (${names.length}):\n`+names.map((n,i)=>`${i+1}. ${n}`).join('\n')); }
+function copyText(t){ navigator.clipboard.writeText(t).then(()=>toast('Copied ✓','ok'),()=>{ prompt('Copy:',t); }); }
+
+/* ---- Scanner ---- */
+let scanner=null, lastScan={id:null,t:0}, actx=null;
+function beep(ok=true){ try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); const o=actx.createOscillator(), g=actx.createGain(); o.frequency.value=ok?880:220; o.connect(g); g.connect(actx.destination); g.gain.value=.15; o.start(); o.stop(actx.currentTime+(ok?.12:.3)); }catch(e){} if(navigator.vibrate) navigator.vibrate(ok?60:[80,60,80]); }
+function scanCount(){ const s=S.sessions.find(x=>x.ID===V.sessionId); $('#scanTitle').textContent=`${s.Title||s.Type} · ${fmtD(s.Date,false)}`; $('#scanCount').textContent=`${S.attendance.filter(a=>a.SessionID===s.ID).length} checked in${getQ().length?' · '+getQ().length+' waiting for internet':''}`; }
+async function openScanner(){
+  if(!V.sessionId) return;
+  $('#scanner').classList.remove('hidden'); scanCount();
+  const res=$('#scanRes'); res.className=''; res.textContent='Point the camera at a member QR';
+  try{
+    scanner = new Html5Qrcode('reader');
+    await scanner.start({facingMode:'environment'}, {fps:12, qrbox:(w,h)=>{const s=Math.floor(Math.min(w,h)*0.7);return {width:s,height:s};}, aspectRatio:1}, async text=>{
+      const id = extractId(text)||text; const now=Date.now();
+      if(lastScan.id===id && now-lastScan.t<3500) return; lastScan={id,t:now};
+      const r = await doCheckin(V.sessionId, id, 'QR');
+      res.className=r.type; res.textContent=r.msg; beep(r.type==='ok'); scanCount();
+      clearTimeout(res._h); res._h=setTimeout(()=>{res.className=''; res.textContent='Ready for next…';}, 2500);
+    }, ()=>{});
+  }catch(e){ res.className='err'; res.textContent='Camera error: '+(e.message||e)+' — allow camera access'; }
+}
+async function closeScanner(){ try{ if(scanner){ await scanner.stop(); scanner.clear(); } }catch(e){} scanner=null; $('#scanner').classList.add('hidden'); render(); }
+
+/* =================== MISSIONS =================== */
+function missionRow(m){
+  const n=S.signups.filter(x=>x.MissionID===m.ID && x.Status!=='Waitlist' && x.Status!=='Cancelled').length; const slots=Number(m.SlotsNeeded||0);
+  return `<div class="card mission ${esc(m.Type)}" onclick="openMission('${m.ID}')" style="cursor:pointer;box-shadow:none;border:1px solid var(--line)">
+    <div class="row between"><span class="tag">${esc(m.Type)} ${m.Source==='Booking'?'· 📅 from booking':''}</span><span class="badge">${esc(m.Status)}</span></div>
+    <div class="nm mt8" style="font-size:16px">${esc(m.Title)}</div>
+    <div class="sub">${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate,false):''}${m.Location?' · 📍 '+esc(m.Location):''}</div>
+    <div class="row between mt8 small"><span><b>${n}</b>${slots?' / '+slots:''} signed up</span>${slots&&n<slots?`<span style="color:var(--err)">needs ${slots-n} more</span>`:''}</div>
+    ${slots?`<div class="bar mt8"><i style="width:${Math.min(100,n/slots*100)}%"></i></div>`:''}
+  </div>`;
+}
+function vMissions(){
+  const t=todayStr();
+  const up=S.missions.filter(m=>(m.EndDate||m.Date)>=t).sort((a,b)=>a.Date<b.Date?-1:1);
+  const past=S.missions.filter(m=>(m.EndDate||m.Date)<t).sort((a,b)=>a.Date<b.Date?1:-1);
+  const list=V.misTab==='up'?up:past;
+  return `<div class="row between"><h2>Missions</h2><button class="btn accent sm" onclick="missionForm()">+ New mission</button></div>
+  <div class="card"><div class="row between"><div><b>Servants sign-up page</b><div class="sub">Share it on the WhatsApp group</div></div>
+    <div class="row"><button class="btn sm ghost" onclick="copyText(joinUrl())">Copy link</button><button class="btn sm ghost" onclick="joinQR()">QR</button></div></div>
+    <div class="row between mt12" style="border-top:1px solid var(--line);padding-top:12px"><div><b>Confirmed bookings</b><div class="sub">${S.settings.BOOKING_SHEET_ID?('Last sync: '+(S.settings.LAST_BOOKING_SYNC||'never')):'Set the bookings sheet in Settings'}</div></div>
+    <button class="btn sm" onclick="syncNow(this)">⟳ Sync</button></div></div>
+  <div class="seg"><button class="${V.misTab==='up'?'on':''}" onclick="V.misTab='up';render()">Upcoming (${up.length})</button><button class="${V.misTab==='past'?'on':''}" onclick="V.misTab='past';render()">Past (${past.length})</button></div>
+  <div class="mt12">${list.map(missionRow).join('') || '<div class="card empty">No missions here.</div>'}</div>`;
+}
+function joinQR(){ modal(`${mhead('Mission sign-up QR')}<p class="sub">Servants scan this to open the sign-up page.</p><div class="qrbox" id="jq"></div><div class="small muted mt8" style="word-break:break-all;text-align:center">${esc(joinUrl())}</div><button class="btn block mt12" onclick="copyText(joinUrl())">Copy link</button>`); qrInto($('#jq'), joinUrl(), 240); }
+async function syncNow(b){
+  const r = await run(b, ()=>api('syncBookings'));
+  modal(`${mhead('Bookings synced ✓')}<div class="grid g2"><div class="card kpi"><div class="l">Confirmed found</div><div class="v">${r.found}</div></div><div class="card kpi"><div class="l">New missions</div><div class="v">${r.created}</div></div></div>
+  <div class="small">Updated: ${r.updated}</div><h3 class="mt12">Columns detected</h3><div class="small">${Object.entries(r.columns).map(([k,v])=>`<div>${k}: <b>${esc(v)}</b></div>`).join('')}</div><p class="sub mt8">If a column is wrong, set its exact header name in Settings → Bookings.</p><button class="btn block mt12" onclick="closeModal()">OK</button>`);
+  reload();
+}
+function missionForm(id){
+  const m=S.missions.find(x=>x.ID===id)||{Type:'Carnival', Date:todayStr(), Status:'Open'};
+  modal(`${mhead(id?'Edit mission':'New mission')}
+  <form id="msf" onsubmit="event.preventDefault();saveMission(this)">
+    <input type="hidden" name="ID" value="${esc(m.ID||'')}">
+    <label class="f">Type</label><div class="chips">${MISSION_TYPES.map(t=>`<label class="chk"><input type="radio" name="Type" value="${t}" ${m.Type===t?'checked':''}>${t}</label>`).join('')}</div>
+    <label class="f">Title *</label><input class="in" name="Title" required value="${esc(m.Title||'')}" placeholder="Carnival – Eparchy of …">
+    <div class="grid g2"><div><label class="f">Eparchy</label><input class="in" name="Eparchy" value="${esc(m.Eparchy||'')}"></div><div><label class="f">Location</label><input class="in" name="Location" value="${esc(m.Location||'')}"></div></div>
+    <div class="grid g2"><div><label class="f">Date *</label><input class="in" type="date" name="Date" required value="${esc(m.Date||'')}"></div><div><label class="f">End date</label><input class="in" type="date" name="EndDate" value="${esc(m.EndDate||'')}"></div></div>
+    <div class="grid g2"><div><label class="f">Servants needed</label><input class="in" type="number" min="0" name="SlotsNeeded" value="${esc(m.SlotsNeeded||'')}"></div><div><label class="f">Status</label><select class="in" name="Status">${['Open','Closed','Done','Cancelled'].map(s=>`<option ${m.Status===s?'selected':''}>${s}</option>`).join('')}</select></div></div>
+    <label class="f">Notes for servants</label><textarea class="in" name="Notes" rows="2">${esc(m.Notes||'')}</textarea>
+    <button class="btn accent block big mt16">Save</button>
+  </form>`);
+}
+async function saveMission(f){
+  const m=await run(f.querySelector('button'), ()=>api('saveMission', formData('msf')));
+  const i=S.missions.findIndex(x=>x.ID===m.ID); if(i>=0) S.missions[i]=m; else S.missions.push(m);
+  closeModal(); render(); toast('Saved ✓','ok');
+}
+function openMission(id){
+  const m=S.missions.find(x=>x.ID===id); if(!m) return;
+  const sg=S.signups.filter(x=>x.MissionID===id).map(x=>({x, mem:S.members.find(y=>y.ID===x.MemberID)})).filter(x=>x.mem);
+  const bk=S.bookings.find(b=>b.MissionID===id);
+  const sess=S.sessions.filter(s=>s.MissionID===id);
+  const notIn=S.members.filter(mm=>mm.Status!=='Inactive' && !sg.some(x=>x.mem.ID===mm.ID)).sort((a,b)=>a.Name.localeCompare(b.Name));
+  const byTeam={}; sg.forEach(({x})=>{ const t=x.Team||'—'; byTeam[t]=(byTeam[t]||0)+1; });
+  modal(`${mhead(esc(m.Title))}
+  <div class="row"><span class="badge ${typeCls(m.Type)}">${esc(m.Type)}</span><span class="badge">${esc(m.Status)}</span>${m.Source==='Booking'?'<span class="badge">📅 from booking</span>':''}</div>
+  <div class="sub mt8">${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?' · 📍 '+esc(m.Location):''}</div>
+  ${bk?`<div class="small mt8">Local contact: <b>${esc(bk.Contact||'—')}</b> ${bk.Phone?`· <a href="${waLink(bk.Phone,'')}" target="_blank">${esc(bk.Phone)}</a>`:''}${bk.Status==='No longer confirmed'?' · <b style="color:var(--err)">Booking no longer confirmed!</b>':''}</div>`:''}
+  ${m.Notes?`<div class="small muted mt8">${esc(m.Notes)}</div>`:''}
+  <div class="chips mt12">${Object.entries(byTeam).map(([t,n])=>`<span class="badge" style="background:${teamColor(t)};color:#fff">${esc(t)}: ${n}</span>`).join('')}</div>
+  <h3 class="mt16">Signed up (${sg.length}${m.SlotsNeeded?' / '+m.SlotsNeeded:''})</h3>
+  <div class="list">${sg.map(({x,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">${esc(x.Team||'')}${x.Note?' · '+esc(x.Note):''}</div></div>
+    <select class="in" style="width:auto;padding:6px" onchange="setSignup('${id}','${mem.ID}',this.value)">${['Signed','Confirmed','Attended','No-show','Waitlist','Removed'].map(s=>`<option ${x.Status===s?'selected':''}>${s}</option>`).join('')}</select></div>`).join('')||'<div class="sub">No one yet</div>'}</div>
+  <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
+  <div class="grid g2 mt16">
+    <button class="btn accent" onclick="missionSession('${id}')">${sess.length?'▣ Open attendance':'▣ Start attendance'}</button>
+    <button class="btn ghost" onclick="copyMission('${id}')">Copy list for WhatsApp</button>
+    <button class="btn" onclick="missionForm('${id}')">Edit</button>
+    <button class="btn danger" onclick="delMission('${id}')">Delete</button>
+  </div>`);
+}
+async function setSignup(mid, memId, status, reopen){
+  await run(null, ()=>api('setSignup',{MissionID:mid, MemberID:memId, Status:status}));
+  const i=S.signups.findIndex(x=>x.MissionID===mid&&x.MemberID===memId);
+  if(status==='Removed'){ if(i>=0) S.signups.splice(i,1); }
+  else if(i>=0) S.signups[i].Status=status;
+  else { const mem=S.members.find(m=>m.ID===memId); S.signups.push({MissionID:mid, MemberID:memId, Status:status, Team:split(mem.Teams)[0]||'', SignedAt:nowStr(), Note:'Added by leader'}); }
+  computeScores(); toast('Updated ✓','ok'); if(reopen||status==='Removed') openMission(mid); render();
+}
+async function missionSession(id){
+  const m=S.missions.find(x=>x.ID===id);
+  let s=S.sessions.filter(x=>x.MissionID===id).sort((a,b)=>a.Date<b.Date?1:-1).find(x=>x.Date===todayStr()) || S.sessions.find(x=>x.MissionID===id);
+  if(!s){ s=await run(null,()=>api('saveSession',{Type: m.Type==='Training'?'Training':(m.Type==='Carnival'?'Carnival':'Other'), Date: (todayStr()>=m.Date && todayStr()<=(m.EndDate||m.Date))?todayStr():m.Date, Title:m.Title, MissionID:id})); S.sessions.push(s); }
+  closeModal(); go('session',{sessionId:s.ID});
+}
+function copyMission(id){ const m=S.missions.find(x=>x.ID===id); const sg=S.signups.filter(x=>x.MissionID===id&&x.Status!=='Waitlist'); const lines=sg.map((x,i)=>`${i+1}. ${(S.members.find(y=>y.ID===x.MemberID)||{}).Name}${x.Team?' ('+x.Team+')':''}`);
+  copyText(`⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}\n\nTeam (${sg.length}):\n${lines.join('\n')}\n\nSign up: ${joinUrl()}`); }
+async function delMission(id){ if(!confirm('Delete this mission and its sign-ups?')) return; await run(null,()=>api('deleteMission',{ID:id})); S.missions=S.missions.filter(m=>m.ID!==id); S.signups=S.signups.filter(s=>s.MissionID!==id); closeModal(); render(); }
+
+/* =================== TEAMS =================== */
+function vTeams(){
+  return `<div class="row between"><h2>Teams</h2><button class="btn accent sm" onclick="teamForm()">+ New team</button></div>
+  <div class="card list">${S.teams.map(t=>{ const ms=S.members.filter(m=>m.Status!=='Inactive'&&split(m.Teams).includes(t.Name)); const lead=S.members.find(m=>m.ID===t.Lead);
+    const sc=ms.map(m=>SC[m.ID]&&SC[m.ID].score).filter(x=>x!=null); const avg=sc.length?Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):'—';
+    return `<div class="it" onclick="teamForm('${esc(t.Name)}')"><div class="av" style="background:${t.Color}">${esc(initials(t.Name).toUpperCase())}</div><div class="grow"><div class="nm">${esc(t.Name)}</div><div class="sub">${ms.length} members${lead?' · Lead: '+esc(lead.Name):''}</div></div><div class="right"><div class="score">${avg}</div><div class="sub">avg</div></div></div>`; }).join('')||'<div class="empty">No teams</div>'}</div>`;
+}
+function teamForm(name){
+  const t=S.teams.find(x=>x.Name===name)||{Color:'#0891b2'};
+  const ms=name?S.members.filter(m=>split(m.Teams).includes(name)):[];
+  modal(`${mhead(name?esc(name):'New team')}
+  <form id="tf" onsubmit="event.preventDefault();saveTeam(this)">
+    <input type="hidden" name="OldName" value="${esc(t.Name||'')}">
+    <label class="f">Team name *</label><input class="in" name="Name" required value="${esc(t.Name||'')}">
+    <div class="grid g2"><div><label class="f">Color</label><input class="in" type="color" name="Color" value="${esc(t.Color)}" style="height:44px;padding:4px"></div>
+    <div><label class="f">Team lead</label><select class="in" name="Lead"><option value="">—</option>${S.members.filter(m=>m.Status!=='Inactive').sort((a,b)=>a.Name.localeCompare(b.Name)).map(m=>`<option value="${m.ID}" ${t.Lead===m.ID?'selected':''}>${esc(m.Name)}</option>`).join('')}</select></div></div>
+    <button class="btn accent block big mt16">Save</button>
+  </form>
+  ${name?`<h3 class="mt16">Members (${ms.length})</h3><div class="list">${ms.map(m=>`<div class="it" onclick="openMember('${m.ID}')">${avatar(m)}<div class="grow nm">${esc(m.Name)}</div><div class="score">${(SC[m.ID]||{}).score??'—'}</div></div>`).join('')||'<div class="sub">No members yet</div>'}</div>
+  <button class="btn danger block mt16" onclick="delTeam('${esc(name)}')">Delete team</button>`:''}`);
+}
+async function saveTeam(f){ await run(f.querySelector('button'), ()=>api('saveTeam', formData('tf'))); closeModal(); reload(); toast('Saved ✓','ok'); }
+async function delTeam(n){ if(!confirm(`Delete team "${n}"? Members stay, only the team is removed from them.`)) return; await run(null,()=>api('deleteTeam',{Name:n})); closeModal(); reload(); }
+
+/* =================== SETTINGS =================== */
+function vSettings(){
+  const s=S.settings; const f=(k,l,type='text',ph='')=>`<label class="f">${l}</label><input class="in" type="${type}" name="${k}" value="${esc(s[k]||'')}" placeholder="${esc(ph)}">`;
+  return `<h2>Settings</h2>
+  <form id="stf" onsubmit="event.preventDefault();saveSettings(this)">
+  <div class="card"><h3>General</h3>${f('SERVICE_NAME','Service name')}${f('LATE_AFTER_MIN','Late after (minutes from start time)','number')}
+    ${f('REQUIRED_TYPES','Sessions everyone must attend (comma separated)','text','Sunday Meeting,Training')}
+    <div class="sub mt8">Other session types (e.g. Carnival) don't count as absence — attending them gives bonus points.</div></div>
+  <div class="card"><h3>Score formula (weights)</h3>
+    <div class="grid g2">${f('W_ATTENDANCE','Attendance %','number')}${f('W_COMMITMENT','Mission commitment %','number')}${f('W_PARTICIPATION','Participation rating %','number')}<div></div>
+    ${f('TYPE_WEIGHT_SUNDAY','Weight: Sunday meeting','number')}${f('TYPE_WEIGHT_TRAINING','Weight: Training','number')}</div>
+    <div class="sub mt8">Score (0–100) = Attendance (late = 75%) + Missions they showed up for after signing up + Average stars you give, plus +1 per extra mission (max +5).</div></div>
+  <div class="card"><h3>📅 Bookings sheet (confirmed dates → missions)</h3>
+    ${f('BOOKING_SHEET_ID','Bookings Google Sheet link or ID','text','https://docs.google.com/spreadsheets/d/…')}
+    ${f('BOOKING_TAB','Tab name (empty = first tab)')}
+    ${f('BOOKING_CONFIRMED_VALUES','Status values that mean “confirmed” (comma separated)')}
+    <details class="mt8"><summary>Column names (only if auto-detect is wrong)</summary>
+      <div class="grid g2">${f('BOOKING_COL_STATUS','Status column')}${f('BOOKING_COL_DATE','Date column')}${f('BOOKING_COL_ENDDATE','End date column')}${f('BOOKING_COL_EPARCHY','Eparchy column')}${f('BOOKING_COL_TYPE','Type column')}${f('BOOKING_COL_KEY','ID column')}${f('BOOKING_COL_CONTACT','Contact name column')}${f('BOOKING_COL_PHONE','Phone column')}</div></details>
+    <div class="sub mt8">Last sync: ${esc(s.LAST_BOOKING_SYNC||'never')}</div>
+  </div>
+  <button class="btn accent block big">Save settings</button>
+  </form>
+  <div class="card mt12"><h3>Export</h3><div class="grid g2"><button class="btn ghost" onclick="exportMembers()">Members + scores (CSV)</button><button class="btn ghost" onclick="exportAttendance()">Attendance (CSV)</button></div></div>
+  <div class="card"><h3>Links</h3><div class="small">Sign-up page: <a href="${esc(joinUrl())}" target="_blank">${esc(joinUrl())}</a></div>
+    <button class="btn danger block mt12" onclick="logout()">Log out</button></div>`;
+}
+async function saveSettings(f){ const d=formData('stf'); S.settings=await run(f.querySelector('button.big'), ()=>api('saveSettings',{settings:d})); computeScores(); render(); toast('Settings saved ✓','ok'); }
+function csv(rows){ return '﻿'+rows.map(r=>r.map(c=>`"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')).join('\n'); }
+function dl(name, text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'})); a.download=name; a.click(); }
+function exportMembers(){ const r=[['ID','Name','Phone','Teams','Role','Status','Score','Level','Attendance %','Commitment %','Avg rating','Extra missions']]; S.members.forEach(m=>{ const s=SC[m.ID]||{}; r.push([m.ID,m.Name,m.Phone,m.Teams,m.Role,m.Status,s.score??'',level(s.score)[0],s.A==null?'':Math.round(s.A),s.C==null?'':Math.round(s.C),s.ratingAvg?s.ratingAvg.toFixed(1):'',s.extra||0]); }); dl('marathon_members.csv', csv(r)); }
+function exportAttendance(){ const r=[['Date','Session','Type','Member ID','Name','Status','Time','Rating','Method']]; S.attendance.forEach(a=>{ const s=S.sessions.find(x=>x.ID===a.SessionID)||{}; const m=S.members.find(x=>x.ID===a.MemberID)||{}; r.push([s.Date,s.Title||s.Type,s.Type,a.MemberID,m.Name,a.Status,a.Time,a.Rating,a.Method]); }); dl('marathon_attendance.csv', csv(r)); }
+
+/* =================== PUBLIC: MEMBER CARD =================== */
+async function viewCard(id){
+  $('#hdrSub').textContent='Member card';
+  $('#main').innerHTML='<div class="empty">Loading card…</div>';
+  try{
+    const m = await api('memberCard',{ID:id}, false);
+    $('#svcName').textContent=m.serviceName||'Marathon Members';
+    $('#main').innerHTML = `<div class="mcard"><div class="small" style="letter-spacing:1px;font-weight:700;color:#fdba74">${esc((m.serviceName||'Marathon Members').toUpperCase())}</div>
+      <div class="qr" id="cq"></div><div class="n">${esc(m.Name)}</div><div style="color:#fdba74;font-weight:700;margin-top:4px">${esc(m.ID)}</div><div class="small mt8" style="color:#cbd5e1">${esc(split(m.Teams).join(' • '))}</div>
+      <div class="small mt12" style="color:#94a3b8">Show this QR at every meeting, training & carnival</div></div>
+      <div style="max-width:360px;margin:14px auto 0" class="grid"><button class="btn accent big" onclick='saveCard(${JSON.stringify(m).replace(/'/g,"&#39;")}, ${JSON.stringify(m.serviceName||"")})'>⬇ Save card to phone</button>
+      <a class="btn ghost" href="?join=1">Sign up for a mission →</a></div>`;
+    qrInto($('#cq'), cardUrl(m.ID), 230);
+  }catch(e){ $('#main').innerHTML=`<div class="card empty">${esc(e.message)}</div>`; }
+}
+
+/* =================== PUBLIC: JOIN MISSIONS =================== */
+let ME = null, PUB = null;
+try{ ME = JSON.parse(localStorage.getItem('mm_me')||'null'); }catch(e){}
+async function viewJoin(){
+  $('#hdrSub').textContent='Mission sign-up';
+  if(!ME) return joinLogin();
+  $('#main').innerHTML='<div class="empty">Loading missions…</div>';
+  try{
+    const [me, pub] = await Promise.all([api('lookupMember',{key:ME.ID},false), api('publicMissions',{},false)]);
+    ME=me; PUB=pub; localStorage.setItem('mm_me', JSON.stringify({ID:me.ID, Name:me.Name}));
+    $('#svcName').textContent=pub.serviceName||'Marathon Members';
+    renderJoin();
+  }catch(e){ if(/find you|inactive|not found/i.test(e.message)){ localStorage.removeItem('mm_me'); ME=null; return joinLogin(e.message); } $('#main').innerHTML=`<div class="card empty">${esc(e.message)}<br><br><button class="btn" onclick="viewJoin()">Try again</button></div>`; }
+}
+function joinLogin(err){
+  $('#main').innerHTML=`<div class="login card"><div class="logo">M</div><h2>Mission sign-up</h2><p class="sub">Enter your mobile number (or member ID from your card)</p>
+  <form onsubmit="event.preventDefault();joinFind(this)"><input class="in" name="k" inputmode="tel" placeholder="01xxxxxxxxx" required style="text-align:center;font-size:17px">
+  ${err?`<div class="small" style="color:var(--err);margin-top:6px">${esc(err)}</div>`:''}<button class="btn accent block big mt12">Continue</button></form></div>`;
+}
+async function joinFind(f){ try{ const me=await run(f.querySelector('button'), ()=>api('lookupMember',{key:f.k.value},false)); ME=me; localStorage.setItem('mm_me', JSON.stringify({ID:me.ID,Name:me.Name})); viewJoin(); }catch(e){} }
+function renderJoin(){
+  const mine={}; (ME.signups||[]).forEach(s=>mine[s.MissionID]=s);
+  $('#main').innerHTML = `<div class="card"><div class="row between"><div><div class="sub">Hello 👋</div><div class="nm" style="font-size:18px">${esc(ME.Name)}</div><div class="sub">${esc(ME.ID)} · ${esc(split(ME.Teams).join(', '))}</div></div>
+    <div class="grid"><a class="btn sm ghost" href="?card=${encodeURIComponent(ME.ID)}">My QR card</a><button class="btn sm ghost" onclick="localStorage.removeItem('mm_me');ME=null;joinLogin()">Not me</button></div></div></div>
+  <h2>Open missions</h2>
+  ${PUB.missions.map(m=>{ const s=mine[m.ID]; const slots=Number(m.SlotsNeeded||0);
+    return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${s.Status==='Signed'?'You’re in ✓':s.Status}</span>`:''}</div>
+    <div class="nm mt8" style="font-size:17px;white-space:normal">${esc(m.Title)}</div>
+    <div class="sub">📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'<br>📍 '+esc(m.Location):''}</div>
+    ${m.Notes?`<div class="small mt8">${esc(m.Notes)}</div>`:''}
+    <div class="small mt8"><b>${m.Signed}</b>${slots?' / '+slots:''} servants signed up</div>${slots?`<div class="bar mt8"><i style="width:${Math.min(100,m.Signed/slots*100)}%"></i></div>`:''}
+    ${s? (s.Status==='Attended'?'':`<button class="btn ghost block mt12" onclick="pubCancel('${m.ID}',this)">Cancel my sign-up</button>`)
+       : `<div class="row mt12"><select class="in grow" id="tm_${m.ID}">${PUB.teams.map(t=>`<option ${split(ME.Teams)[0]===t?'selected':''}>${esc(t)}</option>`).join('')}</select><button class="btn accent" onclick="pubSign('${m.ID}',this)">Sign me up</button></div>`}
+    </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`;
+}
+async function pubSign(id,b){ const team=$('#tm_'+id).value; const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID, Team:team},false)); toast(r.Status==='Waitlist'?'Added to waitlist':'Signed up ✓','ok'); viewJoin(); }
+async function pubCancel(id,b){ if(!confirm('Cancel your sign-up?')) return; await run(b, ()=>api('cancelSignup',{MissionID:id, key:ME.ID},false)); toast('Cancelled'); viewJoin(); }
+
+boot();
+</script>
+</body>
+</html>
