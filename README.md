@@ -13,7 +13,7 @@ Web app لمتابعة خدام MARATHON: الأعضاء، التيمز، الح
 | `index.html` | GitHub |
 | `config.js` | GitHub (حط فيه رابط الـ API) |
 | `lib/qrcode.min.js` و `lib/html5-qrcode.min.js` | GitHub جوه فولدر `lib` |
-| `Code.gs` | Apps Script بس (متحطوش على GitHub) |
+| `Code.gs` | نسخة مرجعية هنا، والشغّال منه بيتلصق في Apps Script (الكود السري الحقيقي اكتبه في Apps Script بس، مش هنا) |
 
 ---
 
