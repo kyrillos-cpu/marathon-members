@@ -658,7 +658,10 @@ async function saveMission(f){
 }
 function openMission(id){
   const m=S.missions.find(x=>x.ID===id); if(!m) return;
-  const sg=S.signups.filter(x=>x.MissionID===id).map(x=>({x, mem:S.members.find(y=>y.ID===x.MemberID)})).filter(x=>x.mem);
+  const ord={Confirmed:0,Attended:0,Signed:1,Waitlist:2,'No-show':3};
+  const sg=S.signups.filter(x=>x.MissionID===id).map(x=>({x, mem:S.members.find(y=>y.ID===x.MemberID)})).filter(x=>x.mem)
+    .sort((a,b)=>(ord[a.x.Status]??1)-(ord[b.x.Status]??1) || (((SC[b.mem.ID]||{}).score??-1)-((SC[a.mem.ID]||{}).score??-1)));
+  const nConf=sg.filter(({x})=>x.Status==='Confirmed'||x.Status==='Attended').length, nWait=sg.filter(({x})=>x.Status==='Waitlist').length;
   const bk=S.bookings.find(b=>b.MissionID===id);
   const sess=S.sessions.filter(s=>s.MissionID===id);
   const notIn=S.members.filter(mm=>mm.Status!=='Inactive' && !sg.some(x=>x.mem.ID===mm.ID)).sort((a,b)=>a.Name.localeCompare(b.Name));
@@ -669,8 +672,9 @@ function openMission(id){
   ${bk?`<div class="small mt8">Local contact: <b>${esc(bk.Contact||'—')}</b> ${bk.Phone?`· <a href="${waLink(bk.Phone,'')}" target="_blank">${esc(bk.Phone)}</a>`:''}${bk.Status==='No longer confirmed'?' · <b style="color:var(--err)">Booking no longer confirmed!</b>':''}</div>`:''}
   ${m.Notes?`<div class="small muted mt8">${esc(m.Notes)}</div>`:''}
   <div class="chips mt12">${Object.entries(byTeam).map(([t,n])=>`<span class="badge" style="background:${teamColor(t)};color:#fff">${esc(t)}: ${n}</span>`).join('')}</div>
-  <h3 class="mt16">Signed up (${sg.length}${m.SlotsNeeded?' / '+m.SlotsNeeded:''})</h3>
-  <div class="list">${sg.map(({x,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">${esc(x.Team||'')}${x.Note?' · '+esc(x.Note):''}</div></div>
+  <h3 class="mt16">Signed up (${sg.length}${m.SlotsNeeded?' / '+m.SlotsNeeded+' needed':''})</h3>
+  <div class="small muted">Confirmed: <b>${nConf}</b> · Waitlist: <b>${nWait}</b> — choose who goes by changing their status to <b>Confirmed</b></div>
+  <div class="list">${sg.map(({x,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">Score <b>${(SC[mem.ID]||{}).score??'—'}</b>${x.Team?' · '+esc(x.Team):''}${x.Note?' · '+esc(x.Note):''}</div></div>
     <select class="in" style="width:auto;padding:6px" onchange="setSignup('${id}','${mem.ID}',this.value)">${['Signed','Confirmed','Attended','No-show','Waitlist','Removed'].map(s=>`<option ${x.Status===s?'selected':''}>${s}</option>`).join('')}</select></div>`).join('')||'<div class="sub">No one yet</div>'}</div>
   <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
   <div class="grid g2 mt16">
