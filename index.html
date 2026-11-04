@@ -624,7 +624,7 @@ function vMissions(){
   const list=V.misTab==='up'?up:past;
   return `<div class="row between"><h2>Missions</h2><button class="btn accent sm" onclick="missionForm()">+ New mission</button></div>
   <div class="card"><div class="row between"><div><b>Servants sign-up page</b><div class="sub">Share it on the WhatsApp group</div></div>
-    <div class="row"><button class="btn sm ghost" onclick="copyText(joinUrl())">Copy link</button><button class="btn sm ghost" onclick="joinQR()">QR</button></div></div>
+    <div class="row"><a class="btn sm ok" target="_blank" href="${'https://wa.me/?text='+encodeURIComponent(announceAll())}">📣 Announce</a><button class="btn sm ghost" onclick="copyText(joinUrl())">Copy link</button><button class="btn sm ghost" onclick="joinQR()">QR</button></div></div>
     <div class="row between mt12" style="border-top:1px solid var(--line);padding-top:12px"><div><b>Confirmed bookings</b><div class="sub">${S.settings.BOOKING_SHEET_ID?('Last sync: '+(S.settings.LAST_BOOKING_SYNC||'never')):'Set the bookings sheet in Settings'}</div></div>
     <button class="btn sm" onclick="syncNow(this)">⟳ Sync</button></div></div>
   <div class="seg"><button class="${V.misTab==='up'?'on':''}" onclick="V.misTab='up';render()">Upcoming (${up.length})</button><button class="${V.misTab==='past'?'on':''}" onclick="V.misTab='past';render()">Past (${past.length})</button></div>
@@ -675,7 +675,8 @@ function openMission(id){
   <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
   <div class="grid g2 mt16">
     <button class="btn accent" onclick="missionSession('${id}')">${sess.length?'▣ Open attendance':'▣ Start attendance'}</button>
-    <button class="btn ghost" onclick="copyMission('${id}')">Copy list for WhatsApp</button>
+    <a class="btn ok" target="_blank" href="${announceLink(id)}">📣 Announce on WhatsApp</a>
+    <button class="btn ghost" onclick="copyMission('${id}')">Copy team list</button>
     <button class="btn" onclick="missionForm('${id}')">Edit</button>
     <button class="btn danger" onclick="delMission('${id}')">Delete</button>
   </div>`);
@@ -694,6 +695,16 @@ async function missionSession(id){
   if(!s){ s=await run(null,()=>api('saveSession',{Type: m.Type==='Training'?'Training':(m.Type==='Carnival'?'Carnival':'Other'), Date: (todayStr()>=m.Date && todayStr()<=(m.EndDate||m.Date))?todayStr():m.Date, Title:m.Title, MissionID:id})); S.sessions.push(s); }
   closeModal(); go('session',{sessionId:s.ID});
 }
+function announceText(m){
+  const slots=Number(m.SlotsNeeded||0), n=S.signups.filter(x=>x.MissionID===m.ID&&x.Status!=='Waitlist'&&x.Status!=='Cancelled').length;
+  return `📣 New Marathon mission!\n\n⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}${slots?`\n👥 We need ${slots} servants (${n} signed up so far)`:''}${m.Notes?'\n📝 '+m.Notes:''}\n\nSign up here 👇\n${joinUrl()}`;
+}
+function announceAll(){
+  const t=todayStr(); const ms=S.missions.filter(m=>m.Status==='Open'&&(m.EndDate||m.Date)>=t).sort((a,b)=>a.Date<b.Date?-1:1);
+  if(!ms.length) return `Marathon missions 🏃‍♂️\nNo open missions right now.\n${joinUrl()}`;
+  return `📣 Open Marathon missions\n\n`+ms.map(m=>`⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.Location?' · 📍 '+m.Location:''}`).join('\n\n')+`\n\nSign up here 👇\n${joinUrl()}`;
+}
+function announceLink(id){ return 'https://wa.me/?text='+encodeURIComponent(announceText(S.missions.find(x=>x.ID===id))); }
 function copyMission(id){ const m=S.missions.find(x=>x.ID===id); const sg=S.signups.filter(x=>x.MissionID===id&&x.Status!=='Waitlist'); const lines=sg.map((x,i)=>`${i+1}. ${(S.members.find(y=>y.ID===x.MemberID)||{}).Name}${x.Team?' ('+x.Team+')':''}`);
   copyText(`⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}\n\nTeam (${sg.length}):\n${lines.join('\n')}\n\nSign up: ${joinUrl()}`); }
 async function delMission(id){ if(!confirm('Delete this mission and its sign-ups?')) return; await run(null,()=>api('deleteMission',{ID:id})); S.missions=S.missions.filter(m=>m.ID!==id); S.signups=S.signups.filter(s=>s.MissionID!==id); closeModal(); render(); }
