@@ -871,7 +871,7 @@ async function viewCard(id){
 }
 
 /* =================== PUBLIC: JOIN MISSIONS =================== */
-let ME = null, PUB = null, PLIB = null, JV = 'missions';
+let ME = null, PUB = null, PLIB = null, PTEAM = null, JV = 'missions';
 try{ ME = JSON.parse(localStorage.getItem('mm_me')||'null'); }catch(e){}
 async function viewJoin(){
   $('#hdrSub').textContent='Mission sign-up';
@@ -894,8 +894,8 @@ function renderJoin(){
   const mine={}; (ME.signups||[]).forEach(s=>mine[s.MissionID]=s);
   $('#main').innerHTML = `<div class="card"><div class="row between"><div><div class="sub">Hello 👋</div><div class="nm" style="font-size:18px">${esc(ME.Name)}</div><div class="sub">${esc(ME.ID)} · ${esc(split(ME.Teams).join(', '))}</div></div>
     <div class="grid"><a class="btn sm ghost" href="?card=${encodeURIComponent(ME.ID)}">My QR card</a><button class="btn sm ghost" onclick="localStorage.removeItem('mm_me');ME=null;joinLogin()">Not me</button></div></div></div>
-  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button></div>
-  ${JV==='library' ? joinLib() : `<h2>Open missions</h2>
+  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button></div>
+  ${JV==='library' ? joinLib() : JV==='team' ? joinTeam() : `<h2>Open missions</h2>
   ${PUB.missions.map(m=>{ const s=mine[m.ID]; const slots=Number(m.SlotsNeeded||0);
     return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${s.Status==='Signed'?'You’re in ✓':s.Status}</span>`:''}</div>
     <div class="nm mt8" style="font-size:17px;white-space:normal">${esc(m.Title)}</div>
@@ -905,6 +905,12 @@ function renderJoin(){
     ${s? (s.Status==='Attended'?'':`<button class="btn ghost block mt12" onclick="pubCancel('${m.ID}',this)">Cancel my sign-up</button>`)
        : `<button class="btn accent block big mt12" onclick="pubSign('${m.ID}',this)">Sign me up</button>`}
     </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`}`;
+}
+function joinTeam(){
+  if(!PTEAM){ api('myTeam',{key:ME.ID},false).then(t=>{PTEAM=t; renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading your team…</div>'; }
+  if(!PTEAM.length) return '<div class="card empty">You are not in a team yet. Ask the service leader to add you 🙏</div>';
+  return PTEAM.map(t=>`<div class="card"><div class="row between"><h3 class="mb0"><span class="badge" style="background:${t.color};color:#fff;font-size:13px">${esc(t.team)}</span></h3><span class="sub">${t.members.length} members</span></div>
+    <div class="list mt8">${t.members.map(x=>`<div class="it" style="cursor:default"><div class="av" style="background:${t.color}">${esc(initials(x.Name).toUpperCase())}</div><div class="grow"><div class="nm">${esc(x.Name)}${x.me?' <span class="badge">You</span>':''}</div>${x.lead?'<div class="sub">⭐ Team lead</div>':''}</div></div>`).join('')}</div></div>`).join('');
 }
 function joinLib(){
   LIBCTX='join';
