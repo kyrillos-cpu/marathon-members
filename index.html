@@ -688,6 +688,7 @@ function openMission(id){
   <div class="row"><span class="badge ${typeCls(m.Type)}">${esc(m.Type)}</span><span class="badge">${esc(m.Status)}</span>${m.Source==='Booking'?'<span class="badge">📅 from booking</span>':''}</div>
   <div class="sub mt8">${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?' · 📍 '+esc(m.Location):''}</div>
   ${contactRow(missionContact(m))}
+  ${calButtons(m,'S.missions')}
   ${m.Notes?`<div class="small muted mt8">${esc(m.Notes)}</div>`:''}
   <h3 class="mt16">Signed up (${sg.length}${m.SlotsNeeded?' / '+m.SlotsNeeded+' needed':''})</h3>
   <div class="small muted">Confirmed: <b>${nConf}</b> · Waitlist: <b>${nWait}</b> — choose who goes by changing their status to <b>Confirmed</b></div>
@@ -854,6 +855,27 @@ function libForm(){
 async function saveLib(f){ const d=formData('lf'); S.library=await run(f.querySelector('button.big'),()=>api('saveLibraryItem',d)); closeModal(); render(); toast('Added ✓','ok'); }
 async function delLib(d){ if(!confirm('Remove this file from the library?')) return; S.library=await run(null,()=>api('deleteLibraryItem',d)); render(); toast('Removed'); }
 
+
+/* =================== CALENDAR =================== */
+function ymd(d){ return d.replace(/-/g,''); }
+function nextDay(d){ const x=new Date(d+'T00:00:00'); x.setDate(x.getDate()+1); return `${x.getFullYear()}${pad(x.getMonth()+1)}${pad(x.getDate())}`; }
+function calTitle(m){ return `Marathon – ${m.Title}`; }
+function calDetails(m){ return `${m.Type||''} mission${m.Eparchy?' – '+m.Eparchy:''}${m.Notes&&!/^Confirmed booking/.test(m.Notes)?'\n'+m.Notes:''}\n\nMarathon Members: ${joinUrl()}`; }
+function gcalLink(m){
+  const end=nextDay((m.EndDate||m.Date).slice(0,10));
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(calTitle(m))+'&dates='+ymd(m.Date.slice(0,10))+'/'+end+'&details='+encodeURIComponent(calDetails(m))+'&location='+encodeURIComponent(m.Location||m.Eparchy||'');
+}
+function icsDownload(m){
+  const e=s=>String(s||'').replace(/[\\,;]/g,x=>'\\'+x).replace(/\n/g,'\\n');
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Marathon Members//EN','BEGIN:VEVENT','UID:'+m.ID+'@marathon-members','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z',
+    'DTSTART;VALUE=DATE:'+ymd(m.Date.slice(0,10)),'DTEND;VALUE=DATE:'+nextDay((m.EndDate||m.Date).slice(0,10)),'SUMMARY:'+e(calTitle(m)),'DESCRIPTION:'+e(calDetails(m)),'LOCATION:'+e(m.Location||m.Eparchy),
+    'BEGIN:VALARM','TRIGGER:-P1D','ACTION:DISPLAY','DESCRIPTION:'+e(calTitle(m)),'END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'})); a.download=(m.Title||'mission').replace(/[^\w؀-ۿ]+/g,'_')+'.ics'; a.click();
+}
+function calButtons(m, find){
+  return `<div class="row mt8" style="gap:6px"><a class="btn sm ghost grow" target="_blank" rel="noopener" href="${gcalLink(m)}">📅 Add to Google Calendar</a><button class="btn sm ghost" onclick="icsDownload(${find}.find(x=>x.ID==='${m.ID}'))">iPhone</button></div>`;
+}
+
 /* =================== PUBLIC: MEMBER CARD =================== */
 async function viewCard(id){
   $('#hdrSub').textContent='Member card';
@@ -900,8 +922,9 @@ function renderJoin(){
     return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${s.Status==='Signed'?'You’re in ✓':s.Status}</span>`:''}</div>
     <div class="nm mt8" style="font-size:17px;white-space:normal">${esc(m.Title)}</div>
     <div class="sub">📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'<br>📍 '+esc(m.Location):''}</div>
-    ${m.Notes?`<div class="small mt8">${esc(m.Notes)}</div>`:''}
+    ${m.Notes&&!/^Confirmed booking/.test(m.Notes)?`<div class="small mt8">${esc(m.Notes)}</div>`:''}
     <div class="small mt8"><b>${m.Signed}</b>${slots?' / '+slots:''} servants signed up</div>${slots?`<div class="bar mt8"><i style="width:${Math.min(100,m.Signed/slots*100)}%"></i></div>`:''}
+    ${s&&s.Status!=='Waitlist'?calButtons(m,'PUB.missions'):''}
     ${s? (s.Status==='Attended'?'':`<button class="btn ghost block mt12" onclick="pubCancel('${m.ID}',this)">Cancel my sign-up</button>`)
        : `<button class="btn accent block big mt12" onclick="pubSign('${m.ID}',this)">Sign me up</button>`}
     </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`}`;
@@ -917,7 +940,7 @@ function joinLib(){
   if(!PLIB){ api('library',{key:ME.ID},false).then(l=>{PLIB=l; renderJoin();}).catch(e=>toast(e.message,'err')); }
   return `<h2>Library</h2><p class="sub" style="margin-top:-6px">Files you may need for trainings and carnivals.</p>${libHtml(PLIB,false)}`;
 }
-async function pubSign(id,b){ const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID},false)); toast(r.Status==='Waitlist'?'Added to waitlist':'Signed up ✓','ok'); viewJoin(); }
+async function pubSign(id,b){ const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID},false)); toast(r.Status==='Waitlist'?'Added to waitlist':'Signed up ✓ — add it to your calendar','ok'); viewJoin(); }
 async function pubCancel(id,b){ if(!confirm('Cancel your sign-up?')) return; await run(b, ()=>api('cancelSignup',{MissionID:id, key:ME.ID},false)); toast('Cancelled'); viewJoin(); }
 
 boot();
