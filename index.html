@@ -910,7 +910,7 @@ function joinTeam(){
   if(!PTEAM){ api('myTeam',{key:ME.ID},false).then(t=>{PTEAM=t; renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading your team…</div>'; }
   if(!PTEAM.length) return '<div class="card empty">You are not in a team yet. Ask the service leader to add you 🙏</div>';
   return PTEAM.map(t=>`<div class="card"><div class="row between"><h3 class="mb0"><span class="badge" style="background:${t.color};color:#fff;font-size:13px">${esc(t.team)}</span></h3><span class="sub">${t.members.length} members</span></div>
-    <div class="list mt8">${t.members.map(x=>`<div class="it" style="cursor:default"><div class="av" style="background:${t.color}">${esc(initials(x.Name).toUpperCase())}</div><div class="grow"><div class="nm">${esc(x.Name)}${x.me?' <span class="badge">You</span>':''}</div>${x.lead?'<div class="sub">⭐ Team lead</div>':''}</div></div>`).join('')}</div></div>`).join('');
+    <div class="list mt8">${t.members.map(x=>`<div class="it" style="cursor:default"><div class="av" style="background:${t.color}">${esc(initials(x.Name).toUpperCase())}</div><div class="grow"><div class="nm" style="white-space:normal">${esc(x.Name)}${x.me?' <span class="badge">You</span>':''}</div><div class="sub">${x.lead?'⭐ Team lead · ':''}${esc(x.Phone||'')}</div></div>${!x.me&&x.Phone?`<a class="btn sm ghost" href="tel:${esc(String(x.Phone).replace(/[^\d+]/g,''))}">📞</a><a class="btn sm ok" target="_blank" href="${waLink(x.Phone,'')}">WhatsApp</a>`:''}</div>`).join('')}</div></div>`).join('');
 }
 function joinLib(){
   LIBCTX='join';
