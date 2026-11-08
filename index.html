@@ -34,7 +34,7 @@ header .sp{flex:1}
 .iconbtn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-size:13px;font-weight:600}
 main{max-width:980px;margin:0 auto;padding:16px 14px 100px}
 nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
-nav.tabs button{flex:1;background:none;border:0;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--muted);cursor:pointer;font-weight:600}
+nav.tabs button{flex:1;min-width:0;background:none;border:0;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;color:var(--muted);cursor:pointer;font-weight:600;white-space:nowrap;overflow:hidden}
 nav.tabs button .ic{font-size:19px;line-height:1}
 nav.tabs button.on{color:var(--accent)}
 @media(min-width:900px){nav.tabs{top:0;bottom:auto;left:auto;right:16px;background:transparent;border:0;width:auto;gap:4px;padding:10px 0}nav.tabs button{flex:none;flex-direction:row;color:#cbd5e1;font-size:13px;padding:8px 10px;border-radius:10px}nav.tabs button.on{background:rgba(255,255,255,.12);color:#fff}header.top{padding-right:640px}main{padding-bottom:40px}}
@@ -112,6 +112,15 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .printgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .pcard{border:1.5px dashed #94a3b8;border-radius:14px;padding:12px;text-align:center;background:#fff;break-inside:avoid}
 .pcard .qrbox{padding:4px}
+/* library */
+.lib-part{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:#fff;margin-bottom:10px}
+.lib-part h3{display:flex;gap:8px;align-items:center;margin:0}
+.lib-item{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.lib-item:first-of-type{border-top:0}
+.lib-item .ic{font-size:22px;flex:none}
+.lib-video{position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000;margin:4px 0 8px}
+.lib-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.chip .cnt{display:block;font-size:10.5px;font-weight:500;opacity:.7}
 @media print{header.top,nav.tabs,.noprint{display:none!important}main{padding:0;max-width:none}body{background:#fff}.printgrid{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
@@ -335,12 +344,12 @@ async function doLogin(f){
 function logout(){ localStorage.removeItem('mm_code'); CODE=''; S=null; location.href=baseUrl(); }
 
 /* =================== NAV =================== */
-const TABS = [['dash','◎','Home'],['members','👥','Members'],['att','▣','Attendance'],['missions','⚑','Missions'],['teams','◈','Teams'],['settings','⚙','Settings']];
+const TABS = [['dash','◎','Home'],['members','👥','Members'],['att','▣','Check-in'],['missions','⚑','Missions'],['library','📚','Library'],['teams','◈','Teams'],['settings','⚙','Settings']];
 function go(v, extra={}){ Object.assign(V, {view:v}, extra); render(); window.scrollTo(0,0); }
 function render(){
   if(!S) return;
   $('#tabs').innerHTML = TABS.map(([k,ic,l])=>`<button class="${(V.view===k||(V.view==='session'&&k==='att')||(V.view==='print'&&k==='members'))?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join('');
-  const f = {dash:vDash, members:vMembers, att:vAttendance, session:vSession, missions:vMissions, teams:vTeams, settings:vSettings, print:vPrint}[V.view] || vDash;
+  const f = {dash:vDash, members:vMembers, att:vAttendance, session:vSession, missions:vMissions, teams:vTeams, settings:vSettings, print:vPrint, library:vLibrary}[V.view] || vDash;
   $('#main').innerHTML = f();
   if(V.view==='print') document.querySelectorAll('[data-qr]').forEach(el=>qrInto(el, el.dataset.qr, 150));
 }
@@ -768,6 +777,74 @@ function dl(name, text){ const a=document.createElement('a'); a.href=URL.createO
 function exportMembers(){ const r=[['ID','Name','Phone','Teams','Role','Status','Score','Level','Attendance %','Commitment %','Avg rating','Extra missions']]; S.members.forEach(m=>{ const s=SC[m.ID]||{}; r.push([m.ID,m.Name,m.Phone,m.Teams,m.Role,m.Status,s.score??'',level(s.score)[0],s.A==null?'':Math.round(s.A),s.C==null?'':Math.round(s.C),s.ratingAvg?s.ratingAvg.toFixed(1):'',s.extra||0]); }); dl('marathon_members.csv', csv(r)); }
 function exportAttendance(){ const r=[['Date','Session','Type','Member ID','Name','Status','Time','Rating','Method']]; S.attendance.forEach(a=>{ const s=S.sessions.find(x=>x.ID===a.SessionID)||{}; const m=S.members.find(x=>x.ID===a.MemberID)||{}; r.push([s.Date,s.Title||s.Type,s.Type,a.MemberID,m.Name,a.Status,a.Time,a.Rating,a.Method]); }); dl('marathon_attendance.csv', csv(r)); }
 
+
+/* =================== LIBRARY =================== */
+const LIB_STAGES=[['ابتدائي','Primary'],['إعدادي','Preparatory']];
+const LIB_TOPICS=[['الأكل','Food'],['الميديا','Media'],['السجاير','Smoking'],['مواد خطرة','Hazardous materials'],['التنمر','Bullying'],['العلاقات','Relationships']];
+const LIB_PARTS=[['شرح الكرنفال','📄','Carnival guide','Step-by-step explanation of the carnival day'],['الماتريال','🧰','Materials','Files and links for the materials you need'],['الفيديوهات','🎬','Videos','Videos for this topic']];
+const GEN_CATS=['Training','Media','Forms','Guides','Videos','Other'];
+let LB={sec:'carnival', stage:'ابتدائي', topic:'الأكل', cat:''}, LIBCTX='admin';
+try{ Object.assign(LB, JSON.parse(localStorage.getItem('mm_lb')||'{}')); }catch(e){}
+function setLB(k,v){ LB[k]=v; try{localStorage.setItem('mm_lb',JSON.stringify(LB));}catch(e){} LIBCTX==='admin'?render():renderJoin(); }
+function ytId(u){ const m=String(u).match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/); return m?m[1]:''; }
+function kindIcon(u){ u=String(u).toLowerCase(); if(ytId(u)) return '▶️'; if(/\.pdf(\?|$)/.test(u)) return '📕'; if(/docs\.google\.com\/presentation/.test(u)) return '📊'; if(/drive\.google|docs\.google/.test(u)) return '📁'; return '🔗'; }
+function en(list,v){ const x=list.find(a=>a[0]===v); return x?x[1]:v; }
+function libItem(it, admin, sec, video){
+  const y=video?ytId(it.url):'';
+  const del = admin ? `<button class="btn sm danger" onclick='delLib(${JSON.stringify(sec==='carnival'?{section:'carnival',row:it.row,url:it.url}:{section:'general',id:it.id}).replace(/'/g,"&#39;")})'>✕</button>` : '';
+  return `<div class="lib-item"><span class="ic">${kindIcon(it.url)}</span><div class="grow"><div class="nm" style="white-space:normal">${esc(it.title||'Untitled')}</div>${it.note?`<div class="sub">${esc(it.note)}</div>`:''}</div><a class="btn sm" href="${esc(it.url)}" target="_blank" rel="noopener">Open</a>${del}</div>`
+   + (y?`<div class="lib-video"><iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/${y}" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`:'');
+}
+function libHtml(lib, admin){
+  if(!lib) return '<div class="card empty">Loading files…</div>';
+  let h=`<div class="seg"><button class="${LB.sec==='carnival'?'on':''}" onclick="setLB('sec','carnival')">🎪 Carnival files</button><button class="${LB.sec==='general'?'on':''}" onclick="setLB('sec','general')">📂 General</button></div>`;
+  if(LB.sec==='carnival'){
+    const topics=LIB_TOPICS.slice(); lib.carnival.forEach(x=>{ if(x.topic && !topics.some(t=>t[0]===x.topic)) topics.push([x.topic,x.topic]); });
+    const inStage=lib.carnival.filter(x=>x.stage===LB.stage);
+    if(!topics.some(t=>t[0]===LB.topic)) LB.topic=topics[0][0];
+    h+=`<div class="mt12"><div class="tag">Curriculum</div><div class="chips mt8">${LIB_STAGES.map(([v,l])=>`<button class="chip ${LB.stage===v?'on':''}" onclick="setLB('stage','${v}')">${l}</button>`).join('')}</div></div>
+    <div class="mt12"><div class="tag">Topic</div><div class="chips mt8">${topics.map(([v,l])=>{ const n=inStage.filter(x=>x.topic===v).length; return `<button class="chip ${LB.topic===v?'on':''}" onclick="setLB('topic','${esc(v)}')">${esc(l)}<span class="cnt">${n?n+' file'+(n>1?'s':''):'empty'}</span></button>`; }).join('')}</div></div><div class="mt12">`;
+    const items=inStage.filter(x=>x.topic===LB.topic);
+    h+=LIB_PARTS.map(([v,ic,l,hint])=>{ const list=items.filter(x=>x.part===v);
+      return `<div class="lib-part"><h3><span>${ic}</span>${l}</h3><div class="sub">${hint}</div><div class="mt8">${list.length?list.map(it=>libItem(it,admin,'carnival',v==='الفيديوهات')).join(''):'<div class="sub" style="padding:8px 0">Nothing here yet.</div>'}</div></div>`; }).join('');
+    const other=items.filter(x=>!LIB_PARTS.some(p=>p[0]===x.part));
+    if(other.length) h+=`<div class="lib-part"><h3>📎 Other</h3>${other.map(it=>libItem(it,admin,'carnival',true)).join('')}</div>`;
+    h+='</div>';
+  } else {
+    const cats=Array.from(new Set(lib.general.map(x=>x.category))).sort();
+    const list=lib.general.filter(x=>!LB.cat||x.category===LB.cat);
+    h+=`<div class="chips mt12"><button class="chip ${!LB.cat?'on':''}" onclick="setLB('cat','')">All<span class="cnt">${lib.general.length}</span></button>${cats.map(c=>`<button class="chip ${LB.cat===c?'on':''}" onclick="setLB('cat','${esc(c)}')">${esc(c)}<span class="cnt">${lib.general.filter(x=>x.category===c).length}</span></button>`).join('')}</div>
+    <div class="lib-part mt12">${list.length?list.map(it=>libItem(it,admin,'general',true)).join(''):'<div class="sub" style="padding:8px 0">No files yet.</div>'}</div>`;
+  }
+  return h;
+}
+function vLibrary(){
+  LIBCTX='admin';
+  if(!S.library){ api('getLibrary').then(l=>{S.library=l; if(V.view==='library') render();}).catch(e=>toast(e.message,'err')); }
+  return `<div class="row between"><h2>Library</h2><div class="row"><button class="btn ghost sm" onclick="S.library=null;render()">↻</button><button class="btn accent sm" onclick="libForm()">+ Add file</button></div></div>
+  <p class="sub" style="margin-top:-6px">Servants see these files from the sign-up page (Library tab). Carnival files are shared with the eparchies website.</p>${libHtml(S.library,true)}`;
+}
+function libForm(){
+  const car=LB.sec==='carnival'; const cats=Array.from(new Set(GEN_CATS.concat((S.library?S.library.general:[]).map(x=>x.category))));
+  modal(`${mhead('Add a file')}
+  <form id="lf" onsubmit="event.preventDefault();saveLib(this)">
+    <label class="f">Section</label><div class="chips"><label class="chk"><input type="radio" name="section" value="carnival" ${car?'checked':''} onchange="document.getElementById('lfC').hidden=false;document.getElementById('lfG').hidden=true">🎪 Carnival files</label><label class="chk"><input type="radio" name="section" value="general" ${car?'':'checked'} onchange="document.getElementById('lfC').hidden=true;document.getElementById('lfG').hidden=false">📂 General</label></div>
+    <div id="lfC" ${car?'':'hidden'}>
+      <div class="grid g2"><div><label class="f">Curriculum</label><select class="in" name="stage">${LIB_STAGES.map(([v,l])=>`<option value="${v}" ${LB.stage===v?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div><label class="f">Topic</label><select class="in" name="topic">${LIB_TOPICS.map(([v,l])=>`<option value="${v}" ${LB.topic===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
+      <label class="f">Part</label><select class="in" name="part">${LIB_PARTS.map(([v,ic,l])=>`<option value="${v}">${ic} ${l}</option>`).join('')}</select>
+    </div>
+    <div id="lfG" ${car?'hidden':''}><label class="f">Category</label><input class="in" name="category" list="catlist" value="${esc(LB.cat||'Training')}"><datalist id="catlist">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+    <label class="f">Title *</label><input class="in" name="title" required placeholder="e.g. Carnival day plan">
+    <label class="f">Link *</label><input class="in" name="url" required inputmode="url" placeholder="https://drive.google.com/… or YouTube link">
+    <div class="sub mt8">For Google Drive files: Share → <b>Anyone with the link</b> → Viewer, then copy the link.</div>
+    <label class="f">Note (optional)</label><input class="in" name="note">
+    <button class="btn accent block big mt16">Save</button>
+  </form>`);
+}
+async function saveLib(f){ const d=formData('lf'); S.library=await run(f.querySelector('button.big'),()=>api('saveLibraryItem',d)); closeModal(); render(); toast('Added ✓','ok'); }
+async function delLib(d){ if(!confirm('Remove this file from the library?')) return; S.library=await run(null,()=>api('deleteLibraryItem',d)); render(); toast('Removed'); }
+
 /* =================== PUBLIC: MEMBER CARD =================== */
 async function viewCard(id){
   $('#hdrSub').textContent='Member card';
@@ -785,7 +862,7 @@ async function viewCard(id){
 }
 
 /* =================== PUBLIC: JOIN MISSIONS =================== */
-let ME = null, PUB = null;
+let ME = null, PUB = null, PLIB = null, JV = 'missions';
 try{ ME = JSON.parse(localStorage.getItem('mm_me')||'null'); }catch(e){}
 async function viewJoin(){
   $('#hdrSub').textContent='Mission sign-up';
@@ -808,7 +885,8 @@ function renderJoin(){
   const mine={}; (ME.signups||[]).forEach(s=>mine[s.MissionID]=s);
   $('#main').innerHTML = `<div class="card"><div class="row between"><div><div class="sub">Hello 👋</div><div class="nm" style="font-size:18px">${esc(ME.Name)}</div><div class="sub">${esc(ME.ID)} · ${esc(split(ME.Teams).join(', '))}</div></div>
     <div class="grid"><a class="btn sm ghost" href="?card=${encodeURIComponent(ME.ID)}">My QR card</a><button class="btn sm ghost" onclick="localStorage.removeItem('mm_me');ME=null;joinLogin()">Not me</button></div></div></div>
-  <h2>Open missions</h2>
+  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button></div>
+  ${JV==='library' ? joinLib() : `<h2>Open missions</h2>
   ${PUB.missions.map(m=>{ const s=mine[m.ID]; const slots=Number(m.SlotsNeeded||0);
     return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${s.Status==='Signed'?'You’re in ✓':s.Status}</span>`:''}</div>
     <div class="nm mt8" style="font-size:17px;white-space:normal">${esc(m.Title)}</div>
@@ -817,7 +895,12 @@ function renderJoin(){
     <div class="small mt8"><b>${m.Signed}</b>${slots?' / '+slots:''} servants signed up</div>${slots?`<div class="bar mt8"><i style="width:${Math.min(100,m.Signed/slots*100)}%"></i></div>`:''}
     ${s? (s.Status==='Attended'?'':`<button class="btn ghost block mt12" onclick="pubCancel('${m.ID}',this)">Cancel my sign-up</button>`)
        : `<button class="btn accent block big mt12" onclick="pubSign('${m.ID}',this)">Sign me up</button>`}
-    </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`;
+    </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`}`;
+}
+function joinLib(){
+  LIBCTX='join';
+  if(!PLIB){ api('library',{key:ME.ID},false).then(l=>{PLIB=l; renderJoin();}).catch(e=>toast(e.message,'err')); }
+  return `<h2>Library</h2><p class="sub" style="margin-top:-6px">Files you may need for trainings and carnivals.</p>${libHtml(PLIB,false)}`;
 }
 async function pubSign(id,b){ const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID},false)); toast(r.Status==='Waitlist'?'Added to waitlist':'Signed up ✓','ok'); viewJoin(); }
 async function pubCancel(id,b){ if(!confirm('Cancel your sign-up?')) return; await run(b, ()=>api('cancelSignup',{MissionID:id, key:ME.ID},false)); toast('Cancelled'); viewJoin(); }
