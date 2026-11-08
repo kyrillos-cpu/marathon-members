@@ -917,7 +917,7 @@ function renderJoin(){
   const mine={}; (ME.signups||[]).forEach(s=>mine[s.MissionID]=s);
   $('#main').innerHTML = `<div class="card"><div class="row between"><div><div class="sub">Hello 👋</div><div class="nm" style="font-size:18px">${esc(ME.Name)}</div><div class="sub">${esc(ME.ID)} · ${esc(split(ME.Teams).join(', '))}</div></div>
     <div class="grid"><a class="btn sm ghost" href="?card=${encodeURIComponent(ME.ID)}">My QR card</a><button class="btn sm ghost" onclick="localStorage.removeItem('mm_me');ME=null;joinLogin()">Not me</button></div></div></div>
-  ${ME.HasEmail?'':`<div class="card" style="border:2px solid var(--accent)"><b>📅 Get your missions in your calendar automatically</b><div class="sub">Write your email once — every mission you sign up for will be added to your calendar, with a reminder the day before.</div>
+  ${ME.HasEmail?'':`<div class="card" style="border:2px solid var(--accent)"><b>📅 Get your missions in your calendar automatically</b><div class="sub">Write your email once — every Marathon mission will appear in your calendar automatically.</div>
     <div class="row mt8"><input class="in grow" id="myEmail" type="email" inputmode="email" placeholder="name@gmail.com"><button class="btn accent" onclick="saveMyEmail(this)">Save</button></div></div>`}
   <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button></div>
   ${JV==='library' ? joinLib() : JV==='team' ? joinTeam() : `<h2>Open missions</h2>
@@ -927,12 +927,12 @@ function renderJoin(){
     <div class="sub">📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'<br>📍 '+esc(m.Location):''}</div>
     ${m.Notes&&!/^Confirmed booking/.test(m.Notes)?`<div class="small mt8">${esc(m.Notes)}</div>`:''}
     <div class="small mt8"><b>${m.Signed}</b>${slots?' / '+slots:''} servants signed up</div>${slots?`<div class="bar mt8"><i style="width:${Math.min(100,m.Signed/slots*100)}%"></i></div>`:''}
-    ${s&&s.Status!=='Waitlist'?(ME.HasEmail?'<div class="small mt8" style="color:var(--ok);font-weight:600">📅 Added to your calendar (check your email invitation)</div>':calButtons(m,'PUB.missions')):''}
+    ${ME.HasEmail?'<div class="small mt8" style="color:var(--ok);font-weight:600">📅 In your calendar</div>':(s&&s.Status!=='Waitlist'?calButtons(m,'PUB.missions'):'')}
     ${s? (s.Status==='Attended'?'':`<button class="btn ghost block mt12" onclick="pubCancel('${m.ID}',this)">Cancel my sign-up</button>`)
        : `<button class="btn accent block big mt12" onclick="pubSign('${m.ID}',this)">Sign me up</button>`}
     </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`}`;
 }
-async function saveMyEmail(b){ const email=$('#myEmail').value.trim(); if(!email) return; await run(b,()=>api('setMyEmail',{key:ME.ID,email},false)); toast('Saved ✓ — your missions will appear in your calendar','ok'); viewJoin(); }
+async function saveMyEmail(b){ const email=$('#myEmail').value.trim(); if(!email) return; await run(b,()=>api('setMyEmail',{key:ME.ID,email},false)); toast('Saved ✓ — Marathon missions will appear in your calendar','ok'); viewJoin(); }
 function joinTeam(){
   if(!PTEAM){ api('myTeam',{key:ME.ID},false).then(t=>{PTEAM=t; renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading your team…</div>'; }
   if(!PTEAM.length) return '<div class="card empty">You are not in a team yet. Ask the service leader to add you 🙏</div>';
@@ -944,7 +944,7 @@ function joinLib(){
   if(!PLIB){ api('library',{key:ME.ID},false).then(l=>{PLIB=l; renderJoin();}).catch(e=>toast(e.message,'err')); }
   return `<h2>Library</h2><p class="sub" style="margin-top:-6px">Files you may need for trainings and carnivals.</p>${libHtml(PLIB,false)}`;
 }
-async function pubSign(id,b){ const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID},false)); toast(r.Status==='Waitlist'?'Added to waitlist':(r.calendar?'Signed up ✓ — added to your calendar':'Signed up ✓'),'ok'); viewJoin(); }
+async function pubSign(id,b){ const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID},false)); toast(r.Status==='Waitlist'?'Added to waitlist':'Signed up ✓','ok'); viewJoin(); }
 async function pubCancel(id,b){ if(!confirm('Cancel your sign-up?')) return; await run(b, ()=>api('cancelSignup',{MissionID:id, key:ME.ID},false)); toast('Cancelled'); viewJoin(); }
 
 boot();
