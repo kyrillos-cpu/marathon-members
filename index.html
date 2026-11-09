@@ -382,6 +382,7 @@ function vDash(){
   const maxT = Math.max(1,...teamCounts.map(x=>x.v));
   return `
   <h2>Welcome 👋</h2>
+  ${annCard()}
   <div class="grid g4">
     <div class="card kpi mb0"><div class="l">Active servants</div><div class="v">${active.length}</div></div>
     <div class="card kpi mb0"><div class="l">Average score</div><div class="v">${avg}</div></div>
@@ -887,6 +888,35 @@ function calButtons(m, find){
   return `<div class="row mt8" style="gap:6px"><a class="btn sm ghost grow" target="_blank" rel="noopener" href="${gcalLink(m)}">📅 Add to Google Calendar</a><button class="btn sm ghost" onclick="icsDownload(${find}.find(x=>x.ID==='${m.ID}'))">iPhone</button></div>`;
 }
 
+
+/* =================== ANNOUNCEMENTS =================== */
+function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function annActive(){ const t=todayStr(); return (S.announcements||[]).filter(a=>a.Text&&(!a.Until||a.Until>=t)).sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
+function annWa(a){ return 'https://wa.me/?text='+encodeURIComponent(`📣 Marathon announcement\n\n${a.Text}\n\n${joinUrl()}`); }
+function annCard(){
+  const list=annActive();
+  return `<div class="card" style="border-left:4px solid var(--accent)"><div class="row between"><h3 class="mb0">📣 Announcements</h3><button class="btn sm accent" onclick="annForm()">+ New</button></div>
+  ${list.length?list.map(a=>`<div class="mt12" style="border-top:1px solid var(--line);padding-top:10px"><div style="white-space:pre-wrap">${esc(a.Text)}</div>
+    <div class="row between mt8"><span class="sub">${fmtD(a.CreatedAt,false)}${a.Until?' · shown until '+fmtD(a.Until,false):''}</span>
+    <div class="row" style="gap:6px"><a class="btn sm ok" target="_blank" href="${annWa(a)}">WhatsApp</a><button class="btn sm ghost" onclick="annForm('${a.ID}')">Edit</button><button class="btn sm danger" onclick="annDel('${a.ID}')">✕</button></div></div></div>`).join('')
+  :'<div class="sub mt8">No announcements. Servants see them at the top of their sign-up page.</div>'}</div>`;
+}
+function annForm(id){
+  const a=(S.announcements||[]).find(x=>x.ID===id)||{Until:addDays(7)};
+  modal(`${mhead(id?'Edit announcement':'New announcement')}
+  <form id="af" onsubmit="event.preventDefault();annSave(this)"><input type="hidden" name="ID" value="${esc(a.ID||'')}">
+    <label class="f">Message *</label><textarea class="in" name="Text" rows="5" required placeholder="e.g. Sunday meeting this week starts at 7 PM instead of 6">${esc(a.Text||'')}</textarea>
+    <label class="f">Show until</label><input class="in" type="date" name="Until" value="${esc(a.Until||'')}">
+    <div class="sub mt8">Leave empty to keep it until you delete it.</div>
+    <button class="btn accent block big mt16">Post</button></form>`);
+}
+async function annSave(f){
+  const d=formData('af'); S.announcements=await run(f.querySelector('button.big'),()=>api('saveAnnouncement',d)); render();
+  const a=S.announcements.find(x=>x.Text===d.Text.trim())||{Text:d.Text};
+  modal(`${mhead('Posted ✓')}<p>All servants will see it at the top of their page.</p><a class="btn ok block big" target="_blank" href="${annWa(a)}" onclick="closeModal()">Send it on WhatsApp too</a><button class="btn ghost block mt8" onclick="closeModal()">Not now</button>`);
+}
+async function annDel(id){ if(!confirm('Delete this announcement?')) return; S.announcements=await run(null,()=>api('deleteAnnouncement',{ID:id})); render(); }
+
 /* =================== PUBLIC: MEMBER CARD =================== */
 async function viewCard(id){
   $('#hdrSub').textContent='Member card';
@@ -932,6 +962,7 @@ function renderJoin(){
   const mine={}; (ME.signups||[]).forEach(s=>mine[s.MissionID]=s);
   $('#main').innerHTML = `<div class="card"><div class="row between"><div><div class="sub">Hello 👋</div><div class="nm" style="font-size:18px">${esc(ME.Name)}</div><div class="sub">${esc(ME.ID)} · ${esc(split(ME.Teams).join(', '))}</div></div>
     <div class="grid"><a class="btn sm ghost" href="?card=${encodeURIComponent(ME.ID)}">My QR card</a><button class="btn sm ghost" onclick="localStorage.removeItem('mm_me');ME=null;joinLogin()">Not me</button></div></div></div>
+  ${(PUB.announcements||[]).map(a=>`<div class="card" style="background:#fff7ed;border-left:4px solid var(--accent)"><div class="tag" style="color:#c2410c">📣 Announcement · ${fmtD(a.CreatedAt,false)}</div><div class="mt8" style="white-space:pre-wrap;font-weight:500">${esc(a.Text)}</div></div>`).join('')}
   ${ME.HasEmail?'':`<div class="card" style="border:2px solid var(--accent)"><b>📅 Get your missions in your calendar automatically</b><div class="sub">Write your email once — every Marathon mission will appear in your calendar automatically.</div>
     <div class="row mt8"><input class="in grow" id="myEmail" type="email" inputmode="email" placeholder="name@gmail.com"><button class="btn accent" onclick="saveMyEmail(this)">Save</button></div></div>`}
   <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button></div>
