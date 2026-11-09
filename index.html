@@ -9,6 +9,8 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Marathon Members</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="config.js"></script>
@@ -302,18 +304,25 @@ async function boot(){
   if(!CODE) return viewLogin();
   await reload();
 }
+function saveCache(){ clearTimeout(window._sc); window._sc=setTimeout(()=>{ try{ if(S&&CODE){ const c=Object.assign({},S); delete c.library; localStorage.setItem('mm_cache', JSON.stringify(c)); } }catch(e){} }, 400); }
+function updating(on){ const b=$('#refreshBtn'); if(b){ b.textContent = on?'⟳ …':'↻'; b.style.opacity = on?.7:1; } }
 async function reload(showToast){
+  // show the last saved data instantly, then refresh from the server in the background
+  if(!S){ try{ const c=JSON.parse(localStorage.getItem('mm_cache')||'null'); if(c&&c.members){ S=c; $('#svcName').textContent=S.settings.SERVICE_NAME||'Marathon Members'; $('#tabs').classList.remove('hidden'); $('#refreshBtn').classList.remove('hidden'); computeScores(); render(); } }catch(e){} }
+  updating(true);
   try{
-    $('#main').innerHTML = S? $('#main').innerHTML : '<div class="empty">Loading data…</div>';
+    if(!S) $('#main').innerHTML = '<div class="empty">Loading data…</div>';
+    const lib = S && S.library;
     S = await api('bootstrap');
+    if(lib) S.library = lib;
     // keep pending offline check-ins visible
     getQ().forEach(it=>{ if(!S.attendance.some(a=>a.SessionID===it.SessionID&&a.MemberID===it.MemberID)) S.attendance.push(Object.assign({Status:'Present',Rating:'',Note:''},it,{_pending:true})); });
     $('#svcName').textContent = S.settings.SERVICE_NAME || 'Marathon Members';
     document.title = S.settings.SERVICE_NAME || 'Marathon Members';
     $('#tabs').classList.remove('hidden'); $('#refreshBtn').classList.remove('hidden');
-    computeScores(); render(); flushQ();
+    computeScores(); render(); flushQ(); updating(false);
     if(showToast) toast('Updated','ok');
-  }catch(e){
+  }catch(e){ updating(false);
     if(/Wrong access code/.test(e.message)){ localStorage.removeItem('mm_code'); CODE=''; return viewLogin('Wrong code'); }
     if(!S) $('#main').innerHTML = `<div class="card empty">Could not load data.<br><b>${esc(e.message)}</b><br><br><button class="btn" onclick="reload()">Try again</button></div>`;
     else toast(e.message,'err');
@@ -341,7 +350,7 @@ async function doLogin(f){
   try{ await run(b, ()=>api('login')); localStorage.setItem('mm_code', code); await reload(); }
   catch(e){ CODE=''; }
 }
-function logout(){ localStorage.removeItem('mm_code'); CODE=''; S=null; location.href=baseUrl(); }
+function logout(){ localStorage.removeItem('mm_code'); localStorage.removeItem('mm_cache'); CODE=''; S=null; location.href=baseUrl(); }
 
 /* =================== NAV =================== */
 const TABS = [['dash','◎','Home'],['members','👥','Members'],['att','▣','Check-in'],['missions','⚑','Missions'],['library','📚','Library'],['teams','◈','Teams'],['settings','⚙','Settings']];
@@ -351,6 +360,7 @@ function render(){
   $('#tabs').innerHTML = TABS.map(([k,ic,l])=>`<button class="${(V.view===k||(V.view==='session'&&k==='att')||(V.view==='print'&&k==='members'))?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join('');
   const f = {dash:vDash, members:vMembers, att:vAttendance, session:vSession, missions:vMissions, teams:vTeams, settings:vSettings, print:vPrint, library:vLibrary}[V.view] || vDash;
   $('#main').innerHTML = f();
+  saveCache();
   if(V.view==='print') document.querySelectorAll('[data-qr]').forEach(el=>qrInto(el, el.dataset.qr, 150));
 }
 
@@ -899,10 +909,15 @@ try{ ME = JSON.parse(localStorage.getItem('mm_me')||'null'); }catch(e){}
 async function viewJoin(){
   $('#hdrSub').textContent='Mission sign-up';
   if(!ME) return joinLogin();
-  $('#main').innerHTML='<div class="empty">Loading missions…</div>';
+  let shown=false;
+  try{ const c=JSON.parse(localStorage.getItem('mm_join')||'null'); if(c&&c.me&&c.me.ID===ME.ID){ ME=c.me; PUB=c.pub; renderJoin(); shown=true; } }catch(e){}
+  if(!shown) $('#main').innerHTML='<div class="empty">Loading missions…</div>';
   try{
-    const [me, pub] = await Promise.all([api('lookupMember',{key:ME.ID},false), api('publicMissions',{},false)]);
+    let me, pub;
+    try{ const r=await api('joinData',{key:ME.ID},false); me=r.me; pub=r.pub; }
+    catch(e){ if(!/Unknown action/.test(e.message)) throw e; [me, pub] = await Promise.all([api('lookupMember',{key:ME.ID},false), api('publicMissions',{},false)]); }
     ME=me; PUB=pub; localStorage.setItem('mm_me', JSON.stringify({ID:me.ID, Name:me.Name}));
+    try{ localStorage.setItem('mm_join', JSON.stringify({me, pub})); }catch(e){}
     $('#svcName').textContent=pub.serviceName||'Marathon Members';
     renderJoin();
   }catch(e){ if(/find you|inactive|not found/i.test(e.message)){ localStorage.removeItem('mm_me'); ME=null; return joinLogin(e.message); } $('#main').innerHTML=`<div class="card empty">${esc(e.message)}<br><br><button class="btn" onclick="viewJoin()">Try again</button></div>`; }
