@@ -804,9 +804,8 @@ function vSettings(){
     ${f('REQUIRED_TYPES','Sessions everyone must attend (comma separated)','text','Sunday Meeting,Training')}
     <div class="sub mt8">Other session types (e.g. Carnival) don't count as absence — attending them gives bonus points.</div></div>
   <div class="card"><h3>✅ Mission approvals</h3>
-    ${f('APPROVAL_CODE','Approval code for team leads (empty = only you approve)')}
     ${f('APPROVER_TEAMS','Teams whose lead can approve (comma separated)','text','Training')}
-    <div class="sub mt8">Set the lead in Teams → the team → Team lead. He opens the sign-up page with his phone, taps <b>Approvals</b> and enters this code.</div></div>
+    <div class="sub mt8">Set the lead in Teams → the team → Team lead. He opens the sign-up page with his phone and finds the <b>Approvals</b> tab.</div></div>
   <div class="card"><h3>Score formula (weights)</h3>
     <div class="grid g2">${f('W_ATTENDANCE','Attendance %','number')}${f('W_COMMITMENT','Mission commitment %','number')}${f('W_PARTICIPATION','Participation rating %','number')}<div></div>
     ${f('TYPE_WEIGHT_SUNDAY','Weight: Sunday meeting','number')}${f('TYPE_WEIGHT_TRAINING','Weight: Training','number')}</div>
@@ -1019,9 +1018,7 @@ function renderJoin(){
 async function saveMyEmail(b){ const email=$('#myEmail').value.trim(); if(!email) return; await run(b,()=>api('setMyEmail',{key:ME.ID,email},false)); toast('Saved ✓ — Marathon missions will appear in your calendar','ok'); viewJoin(); }
 let PAPPR=null;
 function joinAppr(){
-  const code=localStorage.getItem('mm_acode')||'';
-  if(!code) return `<div class="card"><h3>Approvals</h3><p class="sub">Enter the approval code you got from the service leader.</p><div class="row"><input class="in grow" id="acode" type="password" placeholder="Approval code"><button class="btn accent" onclick="localStorage.setItem('mm_acode',$('#acode').value.trim());PAPPR=null;renderJoin()">Open</button></div></div>`;
-  if(!PAPPR){ api('approvals',{key:ME.ID,code},false).then(r=>{PAPPR=r;renderJoin();}).catch(e=>{ toast(e.message,'err'); if(/code/i.test(e.message)){ localStorage.removeItem('mm_acode'); renderJoin(); } }); return '<div class="card empty">Loading requests…</div>'; }
+  if(!PAPPR){ api('approvals',{key:ME.ID},false).then(r=>{PAPPR=r;renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading requests…</div>'; }
   const ord={Pending:0,Confirmed:1,Signed:1,Attended:1,Declined:2};
   return PAPPR.map(m=>{ const pend=m.people.filter(p=>p.Status==='Pending').length, ok=m.people.filter(p=>['Confirmed','Signed','Attended'].includes(p.Status)).length;
     return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span><span class="small"><b>${ok}</b>${m.SlotsNeeded?' / '+esc(m.SlotsNeeded):''} confirmed${pend?` · <b style="color:#854d0e">${pend} waiting</b>`:''}</span></div>
@@ -1030,7 +1027,7 @@ function joinAppr(){
       ${p.Status==='Pending'?`<button class="btn sm ok" onclick="leadDecide('${m.ID}','${p.MemberID}','Confirmed',this)">✓</button><button class="btn sm danger" onclick="leadDecide('${m.ID}','${p.MemberID}','Declined',this)">✕</button>`
         :`<span class="pill p-${p.Status}">${p.Status}</span>${p.Phone?`<a class="btn sm ghost" target="_blank" href="${decisionWa(p,m,p.Status)}">💬</a>`:''}`}</div>`).join('')||'<div class="sub">No requests yet.</div>'}</div></div>`; }).join('') || '<div class="card empty">No upcoming missions.</div>';
 }
-async function leadDecide(mid, memId, status, b){ const code=localStorage.getItem('mm_acode')||''; PAPPR=await run(b,()=>api('decide',{key:ME.ID,code,MissionID:mid,MemberID:memId,Status:status},false)); renderJoin(); toast(status==='Confirmed'?'Confirmed ✓':'Declined','ok'); }
+async function leadDecide(mid, memId, status, b){ PAPPR=await run(b,()=>api('decide',{key:ME.ID,MissionID:mid,MemberID:memId,Status:status},false)); renderJoin(); toast(status==='Confirmed'?'Confirmed ✓':'Declined','ok'); }
 function joinTeam(){
   if(!PTEAM){ api('myTeam',{key:ME.ID},false).then(t=>{PTEAM=t; renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading your team…</div>'; }
   if(!PTEAM.length) return '<div class="card empty">You are not in a team yet. Ask the service leader to add you 🙏</div>';
