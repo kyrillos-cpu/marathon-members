@@ -76,7 +76,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:1
 .empty{color:var(--muted);text-align:center;padding:24px 8px;font-size:14px}
 .pill{border:0;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer}
 .p-Present{background:#dcfce7;color:#166534}.p-Late{background:#fef3c7;color:#92400e}.p-Excused{background:#e0e7ff;color:#3730a3}
-.p-Signed{background:#e0f2fe;color:#075985}.p-Confirmed{background:#dcfce7;color:#166534}.p-Attended{background:#16a34a;color:#fff}.p-No-show{background:#fee2e2;color:#991b1b}.p-Waitlist{background:#fef3c7;color:#92400e}
+.p-Signed{background:#e0f2fe;color:#075985}.p-Pending{background:#fef9c3;color:#854d0e}.p-Declined{background:#f1f5f9;color:#64748b}.p-Confirmed{background:#dcfce7;color:#166534}.p-Attended{background:#16a34a;color:#fff}.p-No-show{background:#fee2e2;color:#991b1b}.p-Waitlist{background:#fef3c7;color:#92400e}
 .t-Training{background:#dbeafe;color:#1e40af}.t-Carnival{background:#ffedd5;color:#9a3412}.t-Sunday{background:#cffafe;color:#155e75}.t-Follow-up{background:#ede9fe;color:#5b21b6}.t-Other{background:#eef0f4}
 .rate{display:inline-flex;gap:1px}.rate button{background:none;border:0;font-size:19px;cursor:pointer;padding:0 1px;color:#d1d5db;line-height:1}.rate button.on{color:#f59e0b}
 .search{position:relative}.search input{padding-left:36px}.search:before{content:"⌕";position:absolute;left:12px;top:8px;font-size:18px;color:var(--muted)}
@@ -254,7 +254,7 @@ function computeScores(){
     S.signups.filter(x=>x.MemberID===m.ID).forEach(sg=>{
       const mi = misById[sg.MissionID]; if(!mi) return;
       if((mi.EndDate||mi.Date) > t) return;
-      if(sg.Status==='Waitlist'||sg.Status==='Cancelled') return;
+      if(['Waitlist','Cancelled','Pending','Declined'].includes(sg.Status)) return;
       const sess = missionSessions[mi.ID]||[];
       let done = sg.Status==='Attended' || sess.some(id=>my[id]);
       let known = done || sg.Status==='No-show' || sess.length>0;
@@ -383,6 +383,7 @@ function vDash(){
   return `
   <h2>Welcome 👋</h2>
   ${annCard()}
+  ${pendingCard()}
   <div class="grid g4">
     <div class="card kpi mb0"><div class="l">Active servants</div><div class="v">${active.length}</div></div>
     <div class="card kpi mb0"><div class="l">Average score</div><div class="v">${avg}</div></div>
@@ -651,13 +652,23 @@ function contactRow(c){
     ${c.phone?`<div class="row" style="gap:6px"><a class="btn sm ghost" href="tel:${esc(c.phone.replace(/[^\d+]/g,''))}">📞</a><a class="btn sm ok" target="_blank" href="${waLink(c.phone,'')}">WhatsApp</a></div>`:''}
   </div>${c.lost?'<div class="small mt8" style="color:var(--err);font-weight:700">⚠ Booking no longer confirmed</div>':''}`;
 }
+const APPROVED=['Confirmed','Attended','Signed'];
+function sgCounts(id){ const l=S.signups.filter(x=>x.MissionID===id); return {ok:l.filter(x=>APPROVED.includes(x.Status)).length, pending:l.filter(x=>x.Status==='Pending').length}; }
+function decisionWa(mem, m, status){
+  const f=(mem.Name||'').split(' ')[0];
+  const t= status==='Declined' ? `Hi ${f} 👋 thank you for signing up for ${m.Title} 🙏 This time the team is complete — we'll count on you in the next mission!`
+    : `Hi ${f} 👋 you're confirmed for ${m.Title} ✅\n📅 ${fmtD(m.Date)}${m.Location?'\n📍 '+m.Location:''}\n\nDetails: ${joinUrl()}`;
+  return waLink(mem.Phone, t);
+}
+function pendingList(){ const t=todayStr(); return S.signups.filter(x=>x.Status==='Pending').map(x=>({x, m:S.missions.find(y=>y.ID===x.MissionID), mem:S.members.find(y=>y.ID===x.MemberID)})).filter(o=>o.m&&o.mem&&(o.m.EndDate||o.m.Date)>=t).sort((a,b)=>a.m.Date<b.m.Date?-1:1); }
+async function quickDecide(mid, memId, status){ await setSignup(mid, memId, status); const m=S.missions.find(x=>x.ID===mid), mem=S.members.find(x=>x.ID===memId); if(mem&&mem.Phone&&confirm(`Send ${mem.Name.split(' ')[0]} a WhatsApp message?`)) window.open(decisionWa(mem,m,status),'_blank'); }
 function missionRow(m){
-  const n=S.signups.filter(x=>x.MissionID===m.ID && x.Status!=='Waitlist' && x.Status!=='Cancelled').length; const slots=Number(m.SlotsNeeded||0);
+  const c=sgCounts(m.ID), n=c.ok; const slots=Number(m.SlotsNeeded||0);
   return `<div class="card mission ${esc(m.Type)}" onclick="openMission('${m.ID}')" style="cursor:pointer;box-shadow:none;border:1px solid var(--line)">
     <div class="row between"><span class="tag">${esc(m.Type)} ${m.Source==='Booking'?'· 📅 from booking':''}</span><span class="badge">${esc(m.Status)}</span></div>
     <div class="nm mt8" style="font-size:16px">${esc(m.Title)}</div>
     <div class="sub">${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate,false):''}${m.Location?' · 📍 '+esc(m.Location):''}</div>
-    <div class="row between mt8 small"><span><b>${n}</b>${slots?' / '+slots:''} signed up</span>${slots&&n<slots?`<span style="color:var(--err)">needs ${slots-n} more</span>`:''}</div>
+    <div class="row between mt8 small"><span><b>${n}</b>${slots?' / '+slots:''} confirmed${c.pending?` · <b style="color:#854d0e">${c.pending} waiting</b>`:''}</span>${slots&&n<slots?`<span style="color:var(--err)">needs ${slots-n} more</span>`:''}</div>
     ${slots?`<div class="bar mt8"><i style="width:${Math.min(100,n/slots*100)}%"></i></div>`:''}
     ${contactRow(missionContact(m))}
   </div>`;
@@ -703,10 +714,10 @@ async function saveMission(f){
 }
 function openMission(id){
   const m=S.missions.find(x=>x.ID===id); if(!m) return;
-  const ord={Confirmed:0,Attended:0,Signed:1,Waitlist:2,'No-show':3};
+  const ord={Pending:0,Confirmed:1,Attended:1,Signed:2,Waitlist:3,'No-show':4,Declined:5};
   const sg=S.signups.filter(x=>x.MissionID===id).map(x=>({x, mem:S.members.find(y=>y.ID===x.MemberID)})).filter(x=>x.mem)
     .sort((a,b)=>(ord[a.x.Status]??1)-(ord[b.x.Status]??1) || (((SC[b.mem.ID]||{}).score??-1)-((SC[a.mem.ID]||{}).score??-1)));
-  const nConf=sg.filter(({x})=>x.Status==='Confirmed'||x.Status==='Attended').length, nWait=sg.filter(({x})=>x.Status==='Waitlist').length;
+  const nConf=sg.filter(({x})=>APPROVED.includes(x.Status)).length, nWait=sg.filter(({x})=>x.Status==='Pending').length;
   const bk=S.bookings.find(b=>b.MissionID===id);
   const sess=S.sessions.filter(s=>s.MissionID===id);
   const notIn=S.members.filter(mm=>mm.Status!=='Inactive' && !sg.some(x=>x.mem.ID===mm.ID)).sort((a,b)=>a.Name.localeCompare(b.Name));
@@ -719,9 +730,10 @@ function openMission(id){
   ${calButtons(m,'S.missions')}
   ${m.Notes?`<div class="small muted mt8">${esc(m.Notes)}</div>`:''}
   <h3 class="mt16">Signed up (${sg.length}${m.SlotsNeeded?' / '+m.SlotsNeeded+' needed':''})</h3>
-  <div class="small muted">Confirmed: <b>${nConf}</b> · Waitlist: <b>${nWait}</b> — choose who goes by changing their status to <b>Confirmed</b></div>
+  <div class="small muted">Confirmed: <b>${nConf}</b> · Waiting for approval: <b>${nWait}</b></div>
   <div class="list">${sg.map(({x,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">Score <b>${(SC[mem.ID]||{}).score??'—'}</b>${x.Team?' · '+esc(x.Team):''}${x.Note?' · '+esc(x.Note):''}</div></div>
-    <select class="in" style="width:auto;padding:6px" onchange="setSignup('${id}','${mem.ID}',this.value)">${['Signed','Confirmed','Attended','No-show','Waitlist','Removed'].map(s=>`<option ${x.Status===s?'selected':''}>${s}</option>`).join('')}</select></div>`).join('')||'<div class="sub">No one yet</div>'}</div>
+    ${x.Status==='Pending'?`<button class="btn sm ok" onclick="quickDecide('${id}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="quickDecide('${id}','${mem.ID}','Declined')">✕</button>`
+      :`<select class="in" style="width:auto;padding:6px" onchange="setSignup('${id}','${mem.ID}',this.value)">${Array.from(new Set(['Pending','Confirmed','Declined','Attended','No-show',x.Status,'Removed'])).map(s=>`<option ${x.Status===s?'selected':''}>${s}</option>`).join('')}</select>`}</div>`).join('')||'<div class="sub">No one yet</div>'}</div>
   <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
   <div class="grid g2 mt16">
     <button class="btn accent" onclick="missionSession('${id}')">${sess.length?'▣ Open attendance':'▣ Start attendance'}</button>
@@ -737,7 +749,7 @@ async function setSignup(mid, memId, status, reopen){
   if(status==='Removed'){ if(i>=0) S.signups.splice(i,1); }
   else if(i>=0) S.signups[i].Status=status;
   else { const mem=S.members.find(m=>m.ID===memId); S.signups.push({MissionID:mid, MemberID:memId, Status:status, Team:split(mem.Teams)[0]||'', SignedAt:nowStr(), Note:'Added by leader'}); }
-  computeScores(); toast('Updated ✓','ok'); if(reopen||status==='Removed') openMission(mid); render();
+  computeScores(); toast('Updated ✓','ok'); if($('#modalRoot').innerHTML&&$('.sheet h3')&&(reopen||status==='Removed'||['Confirmed','Declined'].includes(status))) openMission(mid); render();
 }
 async function missionSession(id){
   const m=S.missions.find(x=>x.ID===id);
@@ -746,8 +758,8 @@ async function missionSession(id){
   closeModal(); go('session',{sessionId:s.ID});
 }
 function announceText(m){
-  const slots=Number(m.SlotsNeeded||0), n=S.signups.filter(x=>x.MissionID===m.ID&&x.Status!=='Waitlist'&&x.Status!=='Cancelled').length;
-  return `📣 New Marathon mission!\n\n⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}${slots?`\n👥 We need ${slots} servants (${n} signed up so far)`:''}${m.Notes&&!/^Confirmed booking/.test(m.Notes)?'\n📝 '+m.Notes:''}${(c=>c&&c.phone?`\n📞 Local coordinator: ${c.name} – ${c.phone}`:'')(missionContact(m))}\n\nSign up here 👇\n${joinUrl()}`;
+  const slots=Number(m.SlotsNeeded||0), n=sgCounts(m.ID).ok;
+  return `📣 New Marathon mission!\n\n⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}${slots?`\n👥 We need ${slots} servants (${n} confirmed so far)`:''}${m.Notes&&!/^Confirmed booking/.test(m.Notes)?'\n📝 '+m.Notes:''}${(c=>c&&c.phone?`\n📞 Local coordinator: ${c.name} – ${c.phone}`:'')(missionContact(m))}\n\nSign up here 👇\n${joinUrl()}`;
 }
 function announceAll(){
   const t=todayStr(); const ms=S.missions.filter(m=>m.Status==='Open'&&(m.EndDate||m.Date)>=t).sort((a,b)=>a.Date<b.Date?-1:1);
@@ -791,6 +803,10 @@ function vSettings(){
   <div class="card"><h3>General</h3>${f('SERVICE_NAME','Service name')}${f('LATE_AFTER_MIN','Late after (minutes from start time)','number')}
     ${f('REQUIRED_TYPES','Sessions everyone must attend (comma separated)','text','Sunday Meeting,Training')}
     <div class="sub mt8">Other session types (e.g. Carnival) don't count as absence — attending them gives bonus points.</div></div>
+  <div class="card"><h3>✅ Mission approvals</h3>
+    ${f('APPROVAL_CODE','Approval code for team leads (empty = only you approve)')}
+    ${f('APPROVER_TEAMS','Teams whose lead can approve (comma separated)','text','Training')}
+    <div class="sub mt8">Set the lead in Teams → the team → Team lead. He opens the sign-up page with his phone, taps <b>Approvals</b> and enters this code.</div></div>
   <div class="card"><h3>Score formula (weights)</h3>
     <div class="grid g2">${f('W_ATTENDANCE','Attendance %','number')}${f('W_COMMITMENT','Mission commitment %','number')}${f('W_PARTICIPATION','Participation rating %','number')}<div></div>
     ${f('TYPE_WEIGHT_SUNDAY','Weight: Sunday meeting','number')}${f('TYPE_WEIGHT_TRAINING','Weight: Training','number')}</div>
@@ -909,6 +925,12 @@ function calButtons(m, find){
 function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function annActive(){ const t=todayStr(); return (S.announcements||[]).filter(a=>a.Text&&(!a.Until||a.Until>=t)).sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
 function annWa(a){ return 'https://wa.me/?text='+encodeURIComponent(`📣 Marathon announcement\n\n${a.Text}\n\n${joinUrl()}`); }
+function pendingCard(){
+  const l=pendingList(); if(!l.length) return '';
+  return `<div class="card" style="border-left:4px solid #eab308"><h3>⏳ Waiting for approval <span class="badge">${l.length}</span></h3><div class="list">
+  ${l.slice(0,15).map(({x,m,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">${esc(m.Title)} · ${fmtD(m.Date,false)} · Score ${(SC[mem.ID]||{}).score??'—'}</div></div>
+    <button class="btn sm ok" onclick="quickDecide('${m.ID}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="quickDecide('${m.ID}','${mem.ID}','Declined')">✕</button></div>`).join('')}</div></div>`;
+}
 function annCard(){
   const list=annActive();
   return `<div class="card" style="border-left:4px solid var(--accent)"><div class="row between"><h3 class="mb0">📣 Announcements</h3><button class="btn sm accent" onclick="annForm()">+ New</button></div>
@@ -981,20 +1003,34 @@ function renderJoin(){
   ${(PUB.announcements||[]).map(a=>`<div class="card" style="background:#fff7ed;border-left:4px solid var(--accent)"><div class="tag" style="color:#c2410c">📣 Announcement · ${fmtD(a.CreatedAt,false)}</div><div class="mt8" style="white-space:pre-wrap;font-weight:500">${esc(a.Text)}</div></div>`).join('')}
   ${ME.HasEmail?'':`<div class="card" style="border:2px solid var(--accent)"><b>📅 Get your missions in your calendar automatically</b><div class="sub">Write your email once — every Marathon mission will appear in your calendar automatically.</div>
     <div class="row mt8"><input class="in grow" id="myEmail" type="email" inputmode="email" placeholder="name@gmail.com"><button class="btn accent" onclick="saveMyEmail(this)">Save</button></div></div>`}
-  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button></div>
-  ${JV==='library' ? joinLib() : JV==='team' ? joinTeam() : `<h2>Open missions</h2>
+  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button>${ME.IsApprover?`<button class="${JV==='appr'?'on':''}" onclick="JV='appr';renderJoin()">✅ Approvals</button>`:''}</div>
+  ${JV==='library' ? joinLib() : JV==='team' ? joinTeam() : JV==='appr' ? joinAppr() : `<h2>Open missions</h2>
   ${PUB.missions.map(m=>{ const s=mine[m.ID]; const slots=Number(m.SlotsNeeded||0);
-    return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${s.Status==='Signed'?'You’re in ✓':s.Status}</span>`:''}</div>
+    return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${({Signed:'You’re in ✓',Pending:'⏳ Waiting for approval',Confirmed:'✅ Confirmed',Declined:'Not this time 🙏',Attended:'Attended ✓'})[s.Status]||s.Status}</span>`:''}</div>
     <div class="nm mt8" style="font-size:17px;white-space:normal">${esc(m.Title)}</div>
     <div class="sub">📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'<br>📍 '+esc(m.Location):''}</div>
     ${m.Notes&&!/^Confirmed booking/.test(m.Notes)?`<div class="small mt8">${esc(m.Notes)}</div>`:''}
     <div class="small mt8"><b>${m.Signed}</b>${slots?' / '+slots:''} servants signed up</div>${slots?`<div class="bar mt8"><i style="width:${Math.min(100,m.Signed/slots*100)}%"></i></div>`:''}
-    ${ME.HasEmail?'<div class="small mt8" style="color:var(--ok);font-weight:600">📅 In your calendar</div>':(s&&s.Status!=='Waitlist'?calButtons(m,'PUB.missions'):'')}
-    ${s? (s.Status==='Attended'?'':`<button class="btn ghost block mt12" onclick="pubCancel('${m.ID}',this)">Cancel my sign-up</button>`)
-       : `<button class="btn accent block big mt12" onclick="pubSign('${m.ID}',this)">Sign me up</button>`}
+    ${ME.HasEmail?'<div class="small mt8" style="color:var(--ok);font-weight:600">📅 In your calendar</div>':(s&&['Signed','Confirmed'].includes(s.Status)?calButtons(m,'PUB.missions'):'')}
+    ${s? (['Attended','Declined'].includes(s.Status)?'':`<button class="btn ghost block mt12" onclick="pubCancel('${m.ID}',this)">${s.Status==='Pending'?'Cancel my request':'Cancel my sign-up'}</button>`)
+       : `<button class="btn accent block big mt12" onclick="pubSign('${m.ID}',this)">Request to join</button>`}
     </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`}`;
 }
 async function saveMyEmail(b){ const email=$('#myEmail').value.trim(); if(!email) return; await run(b,()=>api('setMyEmail',{key:ME.ID,email},false)); toast('Saved ✓ — Marathon missions will appear in your calendar','ok'); viewJoin(); }
+let PAPPR=null;
+function joinAppr(){
+  const code=localStorage.getItem('mm_acode')||'';
+  if(!code) return `<div class="card"><h3>Approvals</h3><p class="sub">Enter the approval code you got from the service leader.</p><div class="row"><input class="in grow" id="acode" type="password" placeholder="Approval code"><button class="btn accent" onclick="localStorage.setItem('mm_acode',$('#acode').value.trim());PAPPR=null;renderJoin()">Open</button></div></div>`;
+  if(!PAPPR){ api('approvals',{key:ME.ID,code},false).then(r=>{PAPPR=r;renderJoin();}).catch(e=>{ toast(e.message,'err'); if(/code/i.test(e.message)){ localStorage.removeItem('mm_acode'); renderJoin(); } }); return '<div class="card empty">Loading requests…</div>'; }
+  const ord={Pending:0,Confirmed:1,Signed:1,Attended:1,Declined:2};
+  return PAPPR.map(m=>{ const pend=m.people.filter(p=>p.Status==='Pending').length, ok=m.people.filter(p=>['Confirmed','Signed','Attended'].includes(p.Status)).length;
+    return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span><span class="small"><b>${ok}</b>${m.SlotsNeeded?' / '+esc(m.SlotsNeeded):''} confirmed${pend?` · <b style="color:#854d0e">${pend} waiting</b>`:''}</span></div>
+    <div class="nm mt8" style="font-size:16px;white-space:normal">${esc(m.Title)}</div><div class="sub">📅 ${fmtD(m.Date)}${m.Location?' · 📍 '+esc(m.Location):''}</div>
+    <div class="list mt8">${m.people.slice().sort((a,b)=>(ord[a.Status]??1)-(ord[b.Status]??1)).map(p=>`<div class="it" style="cursor:default"><div class="grow"><div class="nm" style="white-space:normal">${esc(p.Name)}</div><div class="sub">${esc(p.Teams||'')}</div></div>
+      ${p.Status==='Pending'?`<button class="btn sm ok" onclick="leadDecide('${m.ID}','${p.MemberID}','Confirmed',this)">✓</button><button class="btn sm danger" onclick="leadDecide('${m.ID}','${p.MemberID}','Declined',this)">✕</button>`
+        :`<span class="pill p-${p.Status}">${p.Status}</span>${p.Phone?`<a class="btn sm ghost" target="_blank" href="${decisionWa(p,m,p.Status)}">💬</a>`:''}`}</div>`).join('')||'<div class="sub">No requests yet.</div>'}</div></div>`; }).join('') || '<div class="card empty">No upcoming missions.</div>';
+}
+async function leadDecide(mid, memId, status, b){ const code=localStorage.getItem('mm_acode')||''; PAPPR=await run(b,()=>api('decide',{key:ME.ID,code,MissionID:mid,MemberID:memId,Status:status},false)); renderJoin(); toast(status==='Confirmed'?'Confirmed ✓':'Declined','ok'); }
 function joinTeam(){
   if(!PTEAM){ api('myTeam',{key:ME.ID},false).then(t=>{PTEAM=t; renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading your team…</div>'; }
   if(!PTEAM.length) return '<div class="card empty">You are not in a team yet. Ask the service leader to add you 🙏</div>';
@@ -1006,7 +1042,7 @@ function joinLib(){
   if(!PLIB){ api('library',{key:ME.ID},false).then(l=>{PLIB=l; renderJoin();}).catch(e=>toast(e.message,'err')); }
   return `<h2>Library</h2><p class="sub" style="margin-top:-6px">Files you may need for trainings and carnivals.</p>${libHtml(PLIB,false)}`;
 }
-async function pubSign(id,b){ const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID},false)); toast(r.Status==='Waitlist'?'Added to waitlist':'Signed up ✓','ok'); viewJoin(); }
+async function pubSign(id,b){ const r=await run(b, ()=>api('signup',{MissionID:id, key:ME.ID},false)); toast(r.Status==='Pending'?'Request sent ⏳ — waiting for approval':'Signed up ✓','ok'); viewJoin(); }
 async function pubCancel(id,b){ if(!confirm('Cancel your sign-up?')) return; await run(b, ()=>api('cancelSignup',{MissionID:id, key:ME.ID},false)); toast('Cancelled'); viewJoin(); }
 
 boot();
