@@ -628,7 +628,22 @@ async function openScanner(){
 async function closeScanner(){ try{ if(scanner){ await scanner.stop(); scanner.clear(); } }catch(e){} scanner=null; $('#scanner').classList.add('hidden'); render(); }
 
 /* =================== MISSIONS =================== */
-function missionContact(m){ const b=(S.bookings||[]).find(x=>x.MissionID===m.ID); return b&&(b.Contact||b.Phone)?{name:b.Contact||'', phone:b.Phone||'', lost:b.Status==='No longer confirmed'}:null; }
+function missionCoords(m){ const b=(S.bookings||[]).find(x=>x.MissionID===m.ID); try{ return JSON.parse(b&&b.Coordinators||'[]'); }catch(e){ return []; } }
+function missionContact(m){
+  const b=(S.bookings||[]).find(x=>x.MissionID===m.ID);
+  if(m.CoordName||m.CoordPhone) return {name:m.CoordName||'', phone:m.CoordPhone||'', lost:b&&b.Status==='No longer confirmed'};
+  return b&&(b.Contact||b.Phone)?{name:b.Contact||'', phone:b.Phone||'', lost:b.Status==='No longer confirmed'}:null;
+}
+function coordPicker(m){
+  const list=missionCoords(m); if(list.length<2) return '';
+  const cur=missionContact(m)||{};
+  return `<div class="row mt8" style="gap:6px"><span class="small muted">Change (${list.length}):</span><select class="in grow" style="padding:6px" onchange="setCoord('${m.ID}',this.value)">${list.map((c,i)=>`<option value="${i}" ${String(c.phone).replace(/\D/g,'')===String(cur.phone||'').replace(/\D/g,'')?'selected':''}>${esc(c.name)} – ${esc(c.phone)}</option>`).join('')}</select></div>`;
+}
+async function setCoord(id, i){
+  const m=S.missions.find(x=>x.ID===id); const c=missionCoords(m)[Number(i)]; if(!c) return;
+  const r=await run(null,()=>api('setMissionCoord',{ID:id, name:c.name, phone:c.phone}));
+  Object.assign(m, {CoordName:c.name, CoordPhone:c.phone}, r||{}); toast('Coordinator updated ✓','ok'); openMission(id); render();
+}
 function contactRow(c){
   if(!c) return '';
   return `<div class="row between mt8" style="background:#f0fdf4;border-radius:10px;padding:8px 10px" onclick="event.stopPropagation()">
@@ -700,6 +715,7 @@ function openMission(id){
   <div class="row"><span class="badge ${typeCls(m.Type)}">${esc(m.Type)}</span><span class="badge">${esc(m.Status)}</span>${m.Source==='Booking'?'<span class="badge">📅 from booking</span>':''}</div>
   <div class="sub mt8">${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?' · 📍 '+esc(m.Location):''}</div>
   ${contactRow(missionContact(m))}
+  ${coordPicker(m)}
   ${calButtons(m,'S.missions')}
   ${m.Notes?`<div class="small muted mt8">${esc(m.Notes)}</div>`:''}
   <h3 class="mt16">Signed up (${sg.length}${m.SlotsNeeded?' / '+m.SlotsNeeded+' needed':''})</h3>
