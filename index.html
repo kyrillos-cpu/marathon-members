@@ -853,9 +853,11 @@ function libHtml(lib, admin){
   let h=`<div class="seg"><button class="${LB.sec==='carnival'?'on':''}" onclick="setLB('sec','carnival')">🎪 Carnival files</button><button class="${LB.sec==='general'?'on':''}" onclick="setLB('sec','general')">📂 General</button></div>`;
   if(LB.sec==='carnival'){
     const topics=LIB_TOPICS.slice(); lib.carnival.forEach(x=>{ if(x.topic && !topics.some(t=>t[0]===x.topic)) topics.push([x.topic,x.topic]); });
+    // open where the files are: if the chosen curriculum/topic is empty, jump to the first one that has files
+    if(!libHtml._done && (libHtml._done=true) && !lib.carnival.some(x=>x.stage===LB.stage&&x.topic===LB.topic) && lib.carnival.length){ LB.stage=lib.carnival[0].stage||LB.stage; LB.topic=lib.carnival[0].topic||LB.topic; }
     const inStage=lib.carnival.filter(x=>x.stage===LB.stage);
-    if(!topics.some(t=>t[0]===LB.topic)) LB.topic=topics[0][0];
-    h+=`<div class="mt12"><div class="tag">Curriculum</div><div class="chips mt8">${LIB_STAGES.map(([v,l])=>`<button class="chip ${LB.stage===v?'on':''}" onclick="setLB('stage','${v}')">${l}</button>`).join('')}</div></div>
+    if(!topics.some(t=>t[0]===LB.topic)){ const f=inStage[0]; LB.topic=f?f.topic:topics[0][0]; }
+    h+=`<div class="mt12"><div class="tag">Curriculum</div><div class="chips mt8">${LIB_STAGES.map(([v,l])=>{ const n=lib.carnival.filter(x=>x.stage===v).length; return `<button class="chip ${LB.stage===v?'on':''}" onclick="LB.topic='';setLB('stage','${v}')">${l}<span class="cnt">${n?n+' file'+(n>1?'s':''):'empty'}</span></button>`; }).join('')}</div></div>
     <div class="mt12"><div class="tag">Topic</div><div class="chips mt8">${topics.map(([v,l])=>{ const n=inStage.filter(x=>x.topic===v).length; return `<button class="chip ${LB.topic===v?'on':''}" onclick="setLB('topic','${esc(v)}')">${esc(l)}<span class="cnt">${n?n+' file'+(n>1?'s':''):'empty'}</span></button>`; }).join('')}</div></div><div class="mt12">`;
     const items=inStage.filter(x=>x.topic===LB.topic);
     h+=LIB_PARTS.map(([v,ic,l,hint])=>{ const list=items.filter(x=>x.part===v);
