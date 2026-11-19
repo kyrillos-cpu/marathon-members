@@ -805,6 +805,7 @@ function vSettings(){
     <div class="sub mt8">Other session types (e.g. Carnival) don't count as absence — attending them gives bonus points.</div></div>
   <div class="card"><h3>✅ Mission approvals</h3>
     ${f('APPROVER_TEAMS','Teams whose lead can approve (comma separated)','text','Training')}
+    ${f('ANNOUNCER_TEAMS','Teams whose members can post announcements','text','Media')}
     <div class="sub mt8">Set the lead in Teams → the team → Team lead. He opens the sign-up page with his phone and finds the <b>Approvals</b> tab.</div></div>
   <div class="card"><h3>Score formula (weights)</h3>
     <div class="grid g2">${f('W_ATTENDANCE','Attendance %','number')}${f('W_COMMITMENT','Mission commitment %','number')}${f('W_PARTICIPATION','Participation rating %','number')}<div></div>
@@ -936,7 +937,7 @@ function annCard(){
   const list=annActive();
   return `<div class="card" style="border-left:4px solid var(--accent)"><div class="row between"><h3 class="mb0">📣 Announcements</h3><button class="btn sm accent" onclick="annForm()">+ New</button></div>
   ${list.length?list.map(a=>`<div class="mt12" style="border-top:1px solid var(--line);padding-top:10px"><div style="white-space:pre-wrap">${esc(a.Text)}</div>
-    <div class="row between mt8"><span class="sub">${fmtD(a.CreatedAt,false)}${a.Until?' · shown until '+fmtD(a.Until,false):''}</span>
+    <div class="row between mt8"><span class="sub">${fmtD(a.CreatedAt,false)}${a.By&&a.By!=='Leader'?' · by '+esc(a.By):''}${a.Until?' · shown until '+fmtD(a.Until,false):''}</span>
     <div class="row" style="gap:6px"><a class="btn sm ok" target="_blank" href="${annWa(a)}">WhatsApp</a><button class="btn sm ghost" onclick="annForm('${a.ID}')">Edit</button><button class="btn sm danger" onclick="annDel('${a.ID}')">✕</button></div></div></div>`).join('')
   :'<div class="sub mt8">No announcements. Servants see them at the top of their sign-up page.</div>'}</div>`;
 }
@@ -1004,8 +1005,8 @@ function renderJoin(){
   ${(PUB.announcements||[]).map(a=>`<div class="card" style="background:#fff7ed;border-left:4px solid var(--accent)"><div class="tag" style="color:#c2410c">📣 Announcement · ${fmtD(a.CreatedAt,false)}</div><div class="mt8" style="white-space:pre-wrap;font-weight:500">${esc(a.Text)}</div></div>`).join('')}
   ${ME.HasEmail?'':`<div class="card" style="border:2px solid var(--accent)"><b>📅 Get your missions in your calendar automatically</b><div class="sub">Write your email once — every Marathon mission will appear in your calendar automatically.</div>
     <div class="row mt8"><input class="in grow" id="myEmail" type="email" inputmode="email" placeholder="name@gmail.com"><button class="btn accent" onclick="saveMyEmail(this)">Save</button></div></div>`}
-  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button>${ME.IsApprover?`<button class="${JV==='appr'?'on':''}" onclick="JV='appr';renderJoin()">✅ Approvals</button>`:''}</div>
-  ${JV==='library' ? joinLib() : JV==='team' ? joinTeam() : JV==='appr' ? joinAppr() : `<h2>Open missions</h2>
+  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button>${ME.IsApprover?`<button class="${JV==='appr'?'on':''}" onclick="JV='appr';renderJoin()">✅ Approvals</button>`:''}${ME.IsAnnouncer?`<button class="${JV==='post'?'on':''}" onclick="JV='post';renderJoin()">📣 Post</button>`:''}</div>
+  ${JV==='library' ? joinLib() : JV==='team' ? joinTeam() : JV==='appr' ? joinAppr() : JV==='post' ? joinPost() : `<h2>Open missions</h2>
   ${PUB.missions.map(m=>{ const s=mine[m.ID]; const slots=Number(m.SlotsNeeded||0);
     return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${({Signed:'You’re in ✓',Pending:'⏳ Waiting for approval',Confirmed:'✅ Confirmed',Declined:'Not this time 🙏',Attended:'Attended ✓'})[s.Status]||s.Status}</span>`:''}</div>
     <div class="nm mt8" style="font-size:17px;white-space:normal">${esc(m.Title)}</div>
@@ -1018,6 +1019,26 @@ function renderJoin(){
     </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`}`;
 }
 async function saveMyEmail(b){ const email=$('#myEmail').value.trim(); if(!email) return; await run(b,()=>api('setMyEmail',{key:ME.ID,email},false)); toast('Saved ✓ — Marathon missions will appear in your calendar','ok'); viewJoin(); }
+let PANN=null;
+function joinPost(){
+  if(!PANN){ api('teamAnnouncements',{key:ME.ID},false).then(r=>{PANN=r;renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading…</div>'; }
+  const t=todayStr(), list=PANN.slice().sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1);
+  return `<div class="card" style="border-left:4px solid var(--accent)"><h3>📣 New announcement</h3><div class="sub">Everybody sees it at the top of this page.</div>
+    <textarea class="in mt8" id="pText" rows="4" placeholder="Write the announcement…"></textarea>
+    <label class="f">Show until</label><input class="in" type="date" id="pUntil" value="${addDays(7)}">
+    <button class="btn accent block big mt12" onclick="teamPost(this)">Post</button></div>
+  ${list.map(a=>{ const on=!a.Until||a.Until>=t; return `<div class="card" style="${on?'':'opacity:.6'}"><div style="white-space:pre-wrap">${esc(a.Text)}</div>
+    <div class="row between mt8"><span class="sub">${fmtD(a.CreatedAt,false)}${a.By?' · by '+esc(a.By):''}${on?(a.Until?' · until '+fmtD(a.Until,false):''):' · ended'}</span>
+    <div class="row" style="gap:6px"><a class="btn sm ok" target="_blank" href="${annWa(a)}">WhatsApp</a><button class="btn sm danger" onclick="teamDel('${a.ID}',this)">✕</button></div></div></div>`; }).join('')}`;
+}
+async function teamPost(b){
+  const Text=$('#pText').value.trim(), Until=$('#pUntil').value; if(!Text) return toast('Write the announcement first','err');
+  PANN=await run(b,()=>api('teamSaveAnnouncement',{key:ME.ID,Text,Until},false));
+  const a=PANN.slice().sort((x,y)=>x.CreatedAt<y.CreatedAt?1:-1)[0]||{Text};
+  PUB.announcements=PANN.filter(x=>!x.Until||x.Until>=todayStr()); renderJoin();
+  modal(`${mhead('Posted ✓')}<p>Everybody will see it at the top of their page.</p><a class="btn ok block big" target="_blank" href="${annWa(a)}" onclick="closeModal()">Send it on WhatsApp too</a><button class="btn ghost block mt8" onclick="closeModal()">Not now</button>`);
+}
+async function teamDel(id,b){ if(!confirm('Delete this announcement?')) return; PANN=await run(b,()=>api('teamDeleteAnnouncement',{key:ME.ID,ID:id},false)); PUB.announcements=PANN.filter(x=>!x.Until||x.Until>=todayStr()); renderJoin(); }
 let PAPPR=null;
 function joinAppr(){
   if(!PAPPR){ api('approvals',{key:ME.ID},false).then(r=>{PAPPR=r;renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading requests…</div>'; }
