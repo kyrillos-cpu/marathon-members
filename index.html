@@ -114,6 +114,17 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .printgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .pcard{border:1.5px dashed #94a3b8;border-radius:14px;padding:12px;text-align:center;background:#fff;break-inside:avoid}
 .pcard .qrbox{padding:4px}
+/* servant page tabs (top) */
+.jtabs{position:sticky;top:var(--hh,60px);z-index:15;background:rgba(244,245,248,.96);backdrop-filter:blur(8px);margin:-16px -14px 14px;padding:6px 8px 0;border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.jtabs::-webkit-scrollbar{display:none}
+.jtabs button{flex:1 0 auto;min-width:66px;background:none;border:0;padding:6px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;font-weight:700;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.jtabs button .ic{font-size:20px;line-height:1.1}
+.jtabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.jtabs button .dot{display:inline-block;min-width:16px;padding:0 4px;border-radius:99px;background:var(--accent);color:#fff;font-size:10px;line-height:16px;margin-left:2px}
+img.av{object-fit:cover;background:#e5e7eb}
+.me-av{position:relative;width:62px;height:62px;flex:none;cursor:pointer}
+.me-av .av{width:62px;height:62px;border-radius:18px;font-size:20px}
+.me-av .cam{position:absolute;right:-4px;bottom:-4px;width:26px;height:26px;border-radius:99px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:13px;border:2px solid #fff}
 /* library */
 .lib-part{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:#fff;margin-bottom:10px}
 .lib-part h3{display:flex;gap:8px;align-items:center;margin:0}
@@ -297,7 +308,10 @@ window.addEventListener('online', flushQ);
 setInterval(flushQ, 20000);
 
 /* =================== BOOT =================== */
+function setHH(){ const h=$('#hdr'); if(h) document.documentElement.style.setProperty('--hh', h.offsetHeight+'px'); }
+window.addEventListener('resize', setHH);
 async function boot(){
+  setHH();
   netBadge();
   if(Q.get('card')) return viewCard(Q.get('card'));
   if(Q.has('join')) return viewJoin();
@@ -421,7 +435,18 @@ async function quickSession(type){
 }
 
 /* =================== MEMBERS =================== */
-function avatar(m){ return `<div class="av" style="background:${memberColor(m)}">${esc(initials(m.Name).toUpperCase())}</div>`; }
+function photoUrl(id, size=200){ return `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${size}`; }
+function avatar(m, color){ const c=color||memberColor(m); return m&&m.Photo ? `<img class="av" src="${photoUrl(m.Photo)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;av&quot; style=&quot;background:${c}&quot;>${esc(initials(m.Name).toUpperCase())}</div>'">` : `<div class="av" style="background:${c}">${esc(initials(m&&m.Name).toUpperCase())}</div>`; }
+/** pick an image, crop to a square and shrink it, then call cb(base64 jpeg) */
+function pickPhoto(cb){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; const img=new Image(); const url=URL.createObjectURL(f);
+    img.onload=()=>{ const S=480, c=document.createElement('canvas'); c.width=S; c.height=S; const x=c.getContext('2d');
+      const side=Math.min(img.width,img.height); x.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,S,S);
+      URL.revokeObjectURL(url); cb(c.toDataURL('image/jpeg',.85).split(',')[1]); };
+    img.onerror=()=>toast('Could not read this photo','err'); img.src=url; };
+  inp.click();
+}
 function vMembers(){
   let list = S.members.slice();
   const q=V.mFilter.toLowerCase();
@@ -473,7 +498,7 @@ function openMember(id){
   const hist = S.attendance.filter(a=>a.MemberID===id).map(a=>({a, s:S.sessions.find(x=>x.ID===a.SessionID)})).filter(x=>x.s).sort((x,y)=>x.s.Date<y.s.Date?1:-1);
   const sg = S.signups.filter(x=>x.MemberID===id).map(x=>({x, m:S.missions.find(y=>y.ID===x.MissionID)})).filter(x=>x.m).sort((a,b)=>a.m.Date<b.m.Date?1:-1);
   const pc = v => v==null?'—':Math.round(v)+'%';
-  modal(`${mhead(esc(m.Name))}
+  modal(`${mhead(`<span class="row" style="gap:10px;flex-wrap:nowrap">${avatar(m)}<span>${esc(m.Name)}</span></span>`)}
   <div class="row"><span class="badge">${esc(m.ID)}</span><span class="badge" style="background:${lc};color:#fff">${lv}</span>${m.Status==='Inactive'?'<span class="badge">Inactive</span>':''}<span class="sub">${esc(m.Role||'')}</span></div>
   <div class="grid g2 mt12">
     <div class="qrbox" id="mqr"></div>
@@ -495,9 +520,11 @@ function openMember(id){
   <div class="list">${hist.slice(0,15).map(({a,s})=>`<div class="it" style="cursor:default"><span class="badge ${typeCls(s.Type)}">${esc(s.Type)}</span><div class="grow small">${fmtD(s.Date)}</div><span class="pill p-${a.Status}">${a.Status}</span>${a.Rating?`<span class="stars">${'★'.repeat(a.Rating)}</span>`:''}</div>`).join('')||'<div class="sub">No attendance yet</div>'}</div>
   <h3 class="mt16">Missions</h3>
   <div class="list">${sg.map(({x,m:mi})=>`<div class="it" style="cursor:default"><span class="badge ${typeCls(mi.Type)}">${esc(mi.Type)}</span><div class="grow small"><b>${esc(mi.Title)}</b><br>${fmtD(mi.Date)}</div><span class="pill p-${x.Status}">${x.Status}</span></div>`).join('')||'<div class="sub">No missions yet</div>'}</div>
-  <div class="grid g2 mt16"><button class="btn" onclick="memberForm('${id}')">Edit</button><button class="btn danger" onclick="delMember('${id}')">Delete</button></div>`);
+  <div class="grid g2 mt16"><button class="btn" onclick="memberForm('${id}')">Edit</button><button class="btn ghost" onclick="adminPhoto('${id}')">📷 ${m.Photo?'Change':'Add'} photo</button></div>
+  <button class="btn danger block mt8" onclick="delMember('${id}')">Delete</button>`);
   qrInto(document.getElementById('mqr'), cardUrl(id), 150);
 }
+function adminPhoto(id){ pickPhoto(async b64=>{ toast('Uploading photo…'); try{ const r=await api('setMemberPhoto',{ID:id,data:b64}); const m=S.members.find(x=>x.ID===id); m.Photo=r.Photo; render(); openMember(id); toast('Photo saved ✓','ok'); }catch(e){ toast(e.message,'err'); } }); }
 async function delMember(id){
   const m=S.members.find(x=>x.ID===id);
   if(!confirm(`Delete ${m.Name} and all their attendance?\nTip: set Status = Inactive instead to keep history.`)) return;
@@ -977,6 +1004,7 @@ async function viewCard(id){
     const m = await api('memberCard',{ID:id}, false);
     $('#svcName').textContent=m.serviceName||'Marathon Members';
     $('#main').innerHTML = `<div class="mcard"><div class="small" style="letter-spacing:1px;font-weight:700;color:#fdba74">${esc((m.serviceName||'Marathon Members').toUpperCase())}</div>
+      ${m.Photo?`<img src="${photoUrl(m.Photo,300)}" alt="" style="width:84px;height:84px;border-radius:50%;object-fit:cover;border:3px solid #fff;margin:12px auto 0;display:block">`:''}
       <div class="qr" id="cq"></div><div class="n">${esc(m.Name)}</div><div style="color:#fdba74;font-weight:700;margin-top:4px">${esc(m.ID)}</div><div class="small mt8" style="color:#cbd5e1">${esc(split(m.Teams).join(' • '))}</div>
       <div class="small mt12" style="color:#94a3b8">Show this QR at every meeting, training & carnival</div></div>
       <div style="max-width:360px;margin:14px auto 0" class="grid"><button class="btn accent big" onclick='saveCard(${JSON.stringify(m).replace(/'/g,"&#39;")}, ${JSON.stringify(m.serviceName||"")})'>⬇ Save card to phone</button>
@@ -1012,12 +1040,16 @@ function joinLogin(err){
 async function joinFind(f){ try{ const me=await run(f.querySelector('button'), ()=>api('lookupMember',{key:f.k.value},false)); ME=me; localStorage.setItem('mm_me', JSON.stringify({ID:me.ID,Name:me.Name})); viewJoin(); }catch(e){} }
 function renderJoin(){
   const mine={}; (ME.signups||[]).forEach(s=>mine[s.MissionID]=s);
-  $('#main').innerHTML = `<div class="card"><div class="row between"><div><div class="sub">Hello 👋</div><div class="nm" style="font-size:18px">${esc(ME.Name)}</div><div class="sub">${esc(ME.ID)} · ${esc(split(ME.Teams).join(', '))}</div></div>
-    <div class="grid"><a class="btn sm ghost" href="?card=${encodeURIComponent(ME.ID)}">My QR card</a><button class="btn sm ghost" onclick="localStorage.removeItem('mm_me');ME=null;joinLogin()">Not me</button></div></div></div>
-  ${(PUB.announcements||[]).map(a=>`<div class="card" style="background:#fff7ed;border-left:4px solid var(--accent)"><div class="tag" style="color:#c2410c">📣 Announcement · ${fmtD(a.CreatedAt,false)}</div><div class="mt8" style="white-space:pre-wrap;font-weight:500">${esc(a.Text)}</div></div>`).join('')}
+  const tabs=[['missions','⚑','Missions'],['team','👥','My team'],['library','📚','Library']].concat(ME.IsApprover?[['appr','✅','Approvals']]:[]).concat(ME.IsAnnouncer?[['post','📣','Post']]:[]);
+  $('#main').innerHTML = `<nav class="jtabs">${tabs.map(([k,ic,l])=>`<button class="${JV===k?'on':''}" onclick="JV='${k}';renderJoin();window.scrollTo(0,0)"><span class="ic">${ic}</span>${l}</button>`).join('')}</nav>
+  <div class="card"><div class="row" style="gap:14px;flex-wrap:nowrap">
+    <div class="me-av" onclick="changeMyPhoto()" title="Change photo">${avatar(ME,'#0d2a4a')}<span class="cam">📷</span></div>
+    <div class="grow"><div class="sub">Hello 👋</div><div class="nm" style="font-size:18px;white-space:normal">${esc(ME.Name)}</div><div class="sub">${esc(ME.ID)}${ME.Teams?' · '+esc(split(ME.Teams).join(', ')):''}</div>
+      ${ME.Photo?'':'<div class="small mt8" style="color:var(--accent);font-weight:700;cursor:pointer" onclick="changeMyPhoto()">＋ Add your photo</div>'}</div>
+    <div class="grid" style="gap:6px"><a class="btn sm ghost" href="?card=${encodeURIComponent(ME.ID)}">My QR</a><button class="btn sm ghost" onclick="localStorage.removeItem('mm_me');localStorage.removeItem('mm_join');ME=null;joinLogin()">Not me</button></div></div></div>
+  ${JV==='missions' ? `${(PUB.announcements||[]).map(a=>`<div class="card" style="background:#fff7ed;border-left:4px solid var(--accent)"><div class="tag" style="color:#c2410c">📣 Announcement · ${fmtD(a.CreatedAt,false)}</div><div class="mt8" style="white-space:pre-wrap;font-weight:500">${esc(a.Text)}</div></div>`).join('')}
   ${ME.HasEmail?'':`<div class="card" style="border:2px solid var(--accent)"><b>📅 Get your missions in your calendar automatically</b><div class="sub">Write your email once — every Marathon mission will appear in your calendar automatically.</div>
-    <div class="row mt8"><input class="in grow" id="myEmail" type="email" inputmode="email" placeholder="name@gmail.com"><button class="btn accent" onclick="saveMyEmail(this)">Save</button></div></div>`}
-  <div class="seg" style="margin-bottom:12px"><button class="${JV==='missions'?'on':''}" onclick="JV='missions';renderJoin()">⚑ Missions</button><button class="${JV==='team'?'on':''}" onclick="JV='team';renderJoin()">👥 My team</button><button class="${JV==='library'?'on':''}" onclick="JV='library';renderJoin()">📚 Library</button>${ME.IsApprover?`<button class="${JV==='appr'?'on':''}" onclick="JV='appr';renderJoin()">✅ Approvals</button>`:''}${ME.IsAnnouncer?`<button class="${JV==='post'?'on':''}" onclick="JV='post';renderJoin()">📣 Post</button>`:''}</div>
+    <div class="row mt8"><input class="in grow" id="myEmail" type="email" inputmode="email" placeholder="name@gmail.com"><button class="btn accent" onclick="saveMyEmail(this)">Save</button></div></div>`}` : ''}
   ${JV==='library' ? joinLib() : JV==='team' ? joinTeam() : JV==='appr' ? joinAppr() : JV==='post' ? joinPost() : `<h2>Open missions</h2>
   ${PUB.missions.map(m=>{ const s=mine[m.ID]; const slots=Number(m.SlotsNeeded||0);
     return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span>${s?`<span class="pill p-${s.Status}">${({Signed:'You’re in ✓',Pending:'⏳ Waiting for approval',Confirmed:'✅ Confirmed',Declined:'Not this time 🙏',Attended:'Attended ✓'})[s.Status]||s.Status}</span>`:''}</div>
@@ -1030,6 +1062,7 @@ function renderJoin(){
        : `<button class="btn accent block big mt12" onclick="pubSign('${m.ID}',this)">Request to join</button>`}
     </div>`; }).join('') || '<div class="card empty">No open missions right now. Check again soon 🙏</div>'}`}`;
 }
+function changeMyPhoto(){ pickPhoto(async b64=>{ toast('Uploading photo…'); try{ const r=await api('uploadPhoto',{key:ME.ID,data:b64},false); ME.Photo=r.Photo; try{ const c=JSON.parse(localStorage.getItem('mm_join')||'null'); if(c){ c.me.Photo=r.Photo; localStorage.setItem('mm_join',JSON.stringify(c)); } }catch(e){} PTEAM=null; renderJoin(); toast('Photo saved ✓','ok'); }catch(e){ toast(e.message,'err'); } }); }
 async function saveMyEmail(b){ const email=$('#myEmail').value.trim(); if(!email) return; await run(b,()=>api('setMyEmail',{key:ME.ID,email},false)); toast('Saved ✓ — Marathon missions will appear in your calendar','ok'); viewJoin(); }
 let PANN=null;
 function joinPost(){
@@ -1065,7 +1098,7 @@ function joinTeam(){
   if(!PTEAM){ api('myTeam',{key:ME.ID},false).then(t=>{PTEAM=t; renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading your team…</div>'; }
   if(!PTEAM.length) return '<div class="card empty">You are not in a team yet. Ask the service leader to add you 🙏</div>';
   return PTEAM.map(t=>`<div class="card"><div class="row between"><h3 class="mb0"><span class="badge" style="background:${t.color};color:#fff;font-size:13px">${esc(t.team)}</span></h3><span class="sub">${t.members.length} members</span></div>
-    <div class="list mt8">${t.members.map(x=>`<div class="it" style="cursor:default"><div class="av" style="background:${t.color}">${esc(initials(x.Name).toUpperCase())}</div><div class="grow"><div class="nm" style="white-space:normal">${esc(x.Name)}${x.me?' <span class="badge">You</span>':''}</div><div class="sub">${x.lead?'⭐ Team lead · ':''}${esc(x.Phone||'')}</div></div>${!x.me&&x.Phone?`<a class="btn sm ghost" href="tel:${esc(String(x.Phone).replace(/[^\d+]/g,''))}">📞</a><a class="btn sm ok" target="_blank" href="${waLink(x.Phone,'')}">WhatsApp</a>`:''}</div>`).join('')}</div></div>`).join('');
+    <div class="list mt8">${t.members.map(x=>`<div class="it" style="cursor:default">${avatar(x,t.color)}<div class="grow"><div class="nm" style="white-space:normal">${esc(x.Name)}${x.me?' <span class="badge">You</span>':''}</div><div class="sub">${x.lead?'⭐ Team lead · ':''}${esc(x.Phone||'')}</div></div>${!x.me&&x.Phone?`<a class="btn sm ghost" href="tel:${esc(String(x.Phone).replace(/[^\d+]/g,''))}">📞</a><a class="btn sm ok" target="_blank" href="${waLink(x.Phone,'')}">WhatsApp</a>`:''}</div>`).join('')}</div></div>`).join('');
 }
 function joinLib(){
   LIBCTX='join';

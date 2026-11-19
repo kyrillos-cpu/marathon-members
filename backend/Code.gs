@@ -13,7 +13,7 @@
 const ADMIN_CODE = 'CHANGE-ME';   // leaders' access code
 
 const SHEETS = {
-  Members:    ['ID','Name','Phone','Teams','Role','Church','JoinDate','Status','Notes','CreatedAt','Email'],
+  Members:    ['ID','Name','Phone','Teams','Role','Church','JoinDate','Status','Notes','CreatedAt','Email','Photo'],
   Teams:      ['Name','Color','Lead','CreatedAt'],
   Sessions:   ['ID','Type','Title','Date','StartTime','MissionID','Notes','CreatedAt'],
   Attendance: ['SessionID','MemberID','Time','Status','Rating','Method','Note'],
@@ -71,7 +71,7 @@ function route_(action, d, code) {
     ping: () => ({ pong: true, time: now_() }),
     publicMissions: publicMissions_, lookupMember: lookupMember_,
     signup: signup_, cancelSignup: cancelSignup_, memberCard: memberCard_,
-    myTeam: myTeam_, setMyEmail: setMyEmail_, approvals: approvals_, decide: decide_,
+    myTeam: myTeam_, setMyEmail: setMyEmail_, uploadPhoto: d => { const m = findMember_(d.key); if (!m || m.Status === 'Inactive') throw new Error('Member not found'); return savePhoto_(m, d.data); }, approvals: approvals_, decide: decide_,
     teamAnnouncements: d => { checkAnnouncer_(d); return readTable_('Announcements'); },
     teamSaveAnnouncement: d => { const m = checkAnnouncer_(d); return saveAnnouncement_(Object.assign({}, d, { By: m.Name })); },
     teamDeleteAnnouncement: d => { checkAnnouncer_(d); deleteWhere_('Announcements', r => r.ID === d.ID); return readTable_('Announcements'); },
@@ -88,6 +88,7 @@ function route_(action, d, code) {
     syncBookings: syncBookings, saveSettings: saveSettings_,
     getLibrary: getLibrary_, saveLibraryItem: saveLibraryItem_, deleteLibraryItem: deleteLibraryItem_,
     setMissionCoord: d => { upsert_('Missions', r => r.ID === d.ID, { CoordName: d.name || '', CoordPhone: d.phone || '' }); calMission_(d.ID); return readTable_('Missions').filter(x => x.ID === d.ID)[0]; },
+    setMemberPhoto: d => { const m = readTable_('Members').filter(x => x.ID === d.ID)[0]; if (!m) throw new Error('Member not found'); return savePhoto_(m, d.data); },
     saveAnnouncement: saveAnnouncement_,
     reviewAnnouncement: d => { upsert_('Announcements', r => r.ID === d.ID, { Status: d.Status === 'Approved' ? 'Approved' : 'Rejected' }); return readTable_('Announcements'); }, deleteAnnouncement: d => { deleteWhere_('Announcements', r => r.ID === d.ID); return readTable_('Announcements'); }
   };
@@ -416,7 +417,7 @@ function lookupMember_(d) {
   if (!m) throw new Error('We could not find you. Check your phone number or member ID.');
   if (m.Status === 'Inactive') throw new Error('Your profile is inactive. Contact the service leader.');
   const mine = readTable_('Signups').filter(s => s.MemberID === m.ID).map(s => ({ MissionID: s.MissionID, Status: s.Status, Team: s.Team }));
-  return { ID: m.ID, Name: m.Name, Teams: m.Teams, HasEmail: !!m.Email, IsApprover: isApprover_(m), IsAnnouncer: isAnnouncer_(m), signups: mine };
+  return { ID: m.ID, Name: m.Name, Teams: m.Teams, Photo: m.Photo || '', HasEmail: !!m.Email, IsApprover: isApprover_(m), IsAnnouncer: isAnnouncer_(m), signups: mine };
 }
 function signup_(d) {
   const m = findMember_(d.key);
@@ -442,7 +443,7 @@ function cancelSignup_(d) {
 function memberCard_(d) {
   const m = findMember_(d.ID);
   if (!m) throw new Error('Member not found');
-  return { ID: m.ID, Name: m.Name, Teams: m.Teams, Role: m.Role, serviceName: settings_().SERVICE_NAME };
+  return { ID: m.ID, Name: m.Name, Teams: m.Teams, Role: m.Role, Photo: m.Photo || '', serviceName: settings_().SERVICE_NAME };
 }
 
 /* ======================= BOOKINGS SYNC ======================= */
@@ -702,7 +703,7 @@ function myTeam_(d) {
     return {
       team: t, color: tm.Color || '#64748b', lead: lead ? lead.Name : '',
       members: members.filter(x => splitList_(x.Teams).indexOf(t) >= 0)
-        .map(x => ({ ID: x.ID, Name: x.Name, Phone: x.Phone, me: x.ID === m.ID, lead: x.ID === tm.Lead }))
+        .map(x => ({ ID: x.ID, Name: x.Name, Phone: x.Phone, Photo: x.Photo || '', me: x.ID === m.ID, lead: x.ID === tm.Lead }))
         .sort((a, b) => (b.lead - a.lead) || a.Name.localeCompare(b.Name))
     };
   });
@@ -872,3 +873,23 @@ function checkAnnouncer_(d) {
   if (!isAnnouncer_(m)) throw new Error('Only the media team can post announcements');
   return m;
 }
+
+/* ======================= PHOTOS ======================= */
+/** Profile photos are saved in the Drive folder "Marathon Members Photos" (owner's Drive), viewable by link. */
+function photosFolder_() {
+  const it = DriveApp.getFoldersByName('Marathon Members Photos');
+  return it.hasNext() ? it.next() : DriveApp.createFolder('Marathon Members Photos');
+}
+function savePhoto_(m, b64) {
+  b64 = String(b64 || '').replace(/^data:image\/\w+;base64,/, '');
+  if (!b64) throw new Error('No photo');
+  if (b64.length > 2500000) throw new Error('Photo is too big');
+  const blob = Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg', m.ID + '_' + Date.now() + '.jpg');
+  const file = photosFolder_().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  if (m.Photo) { try { DriveApp.getFileById(m.Photo).setTrashed(true); } catch (e) {} }
+  upsert_('Members', r => r.ID === m.ID, { Photo: file.getId() });
+  return { Photo: file.getId() };
+}
+/** Run once from the editor after pasting this version (gives the script permission to save photos). */
+function authorizePhotos() { photosFolder_(); Logger.log('Photos folder ready'); }
