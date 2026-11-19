@@ -925,7 +925,14 @@ function calButtons(m, find){
 
 /* =================== ANNOUNCEMENTS =================== */
 function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function annActive(){ const t=todayStr(); return (S.announcements||[]).filter(a=>a.Text&&(!a.Until||a.Until>=t)).sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
+function annActive(){ const t=todayStr(); return (S.announcements||[]).filter(a=>a.Text&&(!a.Until||a.Until>=t)&&!['Pending','Rejected'].includes(a.Status)).sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
+function annPending(){ return (S.announcements||[]).filter(a=>a.Status==='Pending').sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
+async function annReview(id, status){
+  S.announcements=await run(null,()=>api('reviewAnnouncement',{ID:id, Status:status})); render();
+  const a=S.announcements.find(x=>x.ID===id);
+  if(status==='Approved') modal(`${mhead('Approved ✓')}<p>It's now at the top of every servant's page.</p><a class="btn ok block big" target="_blank" href="${annWa(a)}" onclick="closeModal()">Send it on WhatsApp</a><button class="btn ghost block mt8" onclick="closeModal()">Not now</button>`);
+  else toast('Rejected');
+}
 function annWa(a){ return 'https://wa.me/?text='+encodeURIComponent(`📣 Marathon announcement\n\n${a.Text}\n\n${joinUrl()}`); }
 function pendingCard(){
   const l=pendingList(); if(!l.length) return '';
@@ -935,7 +942,12 @@ function pendingCard(){
 }
 function annCard(){
   const list=annActive();
-  return `<div class="card" style="border-left:4px solid var(--accent)"><div class="row between"><h3 class="mb0">📣 Announcements</h3><button class="btn sm accent" onclick="annForm()">+ New</button></div>
+  const pend=annPending();
+  const pendHtml = pend.length ? `<div class="card" style="border-left:4px solid #eab308"><h3>⏳ Announcements waiting for your OK <span class="badge">${pend.length}</span></h3>
+    ${pend.map(a=>`<div class="mt12" style="border-top:1px solid var(--line);padding-top:10px"><div style="white-space:pre-wrap">${esc(a.Text)}</div>
+    <div class="row between mt8"><span class="sub">by ${esc(a.By||'—')} · ${fmtD(a.CreatedAt,false)}${a.Until?' · until '+fmtD(a.Until,false):''}</span>
+    <div class="row" style="gap:6px"><button class="btn sm ok" onclick="annReview('${a.ID}','Approved')">✓ Approve</button><button class="btn sm danger" onclick="annReview('${a.ID}','Rejected')">✕</button></div></div></div>`).join('')}</div>` : '';
+  return pendHtml + `<div class="card" style="border-left:4px solid var(--accent)"><div class="row between"><h3 class="mb0">📣 Announcements</h3><button class="btn sm accent" onclick="annForm()">+ New</button></div>
   ${list.length?list.map(a=>`<div class="mt12" style="border-top:1px solid var(--line);padding-top:10px"><div style="white-space:pre-wrap">${esc(a.Text)}</div>
     <div class="row between mt8"><span class="sub">${fmtD(a.CreatedAt,false)}${a.By&&a.By!=='Leader'?' · by '+esc(a.By):''}${a.Until?' · shown until '+fmtD(a.Until,false):''}</span>
     <div class="row" style="gap:6px"><a class="btn sm ok" target="_blank" href="${annWa(a)}">WhatsApp</a><button class="btn sm ghost" onclick="annForm('${a.ID}')">Edit</button><button class="btn sm danger" onclick="annDel('${a.ID}')">✕</button></div></div></div>`).join('')
@@ -1023,22 +1035,20 @@ let PANN=null;
 function joinPost(){
   if(!PANN){ api('teamAnnouncements',{key:ME.ID},false).then(r=>{PANN=r;renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading…</div>'; }
   const t=todayStr(), list=PANN.slice().sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1);
-  return `<div class="card" style="border-left:4px solid var(--accent)"><h3>📣 New announcement</h3><div class="sub">Everybody sees it at the top of this page.</div>
+  return `<div class="card" style="border-left:4px solid var(--accent)"><h3>📣 New announcement</h3><div class="sub">It goes to the service leader first — after his OK everybody sees it, and you can send it on WhatsApp.</div>
     <textarea class="in mt8" id="pText" rows="4" placeholder="Write the announcement…"></textarea>
     <label class="f">Show until</label><input class="in" type="date" id="pUntil" value="${addDays(7)}">
     <button class="btn accent block big mt12" onclick="teamPost(this)">Post</button></div>
-  ${list.map(a=>{ const on=!a.Until||a.Until>=t; return `<div class="card" style="${on?'':'opacity:.6'}"><div style="white-space:pre-wrap">${esc(a.Text)}</div>
+  ${list.map(a=>{ const on=!a.Until||a.Until>=t, st=a.Status||'Approved'; return `<div class="card" style="${on&&st!=='Rejected'?'':'opacity:.6'}"><div class="row between"><span class="pill p-${st==='Approved'?'Confirmed':st==='Rejected'?'Declined':'Pending'}">${st==='Approved'?'✅ Published':st==='Rejected'?'Not approved':'⏳ Waiting for approval'}</span></div><div class="mt8" style="white-space:pre-wrap">${esc(a.Text)}</div>
     <div class="row between mt8"><span class="sub">${fmtD(a.CreatedAt,false)}${a.By?' · by '+esc(a.By):''}${on?(a.Until?' · until '+fmtD(a.Until,false):''):' · ended'}</span>
-    <div class="row" style="gap:6px"><a class="btn sm ok" target="_blank" href="${annWa(a)}">WhatsApp</a><button class="btn sm danger" onclick="teamDel('${a.ID}',this)">✕</button></div></div></div>`; }).join('')}`;
+    <div class="row" style="gap:6px">${st==='Approved'?`<a class="btn sm ok" target="_blank" href="${annWa(a)}">WhatsApp</a>`:''}<button class="btn sm danger" onclick="teamDel('${a.ID}',this)">✕</button></div></div></div>`; }).join('')}`;
 }
 async function teamPost(b){
   const Text=$('#pText').value.trim(), Until=$('#pUntil').value; if(!Text) return toast('Write the announcement first','err');
   PANN=await run(b,()=>api('teamSaveAnnouncement',{key:ME.ID,Text,Until},false));
-  const a=PANN.slice().sort((x,y)=>x.CreatedAt<y.CreatedAt?1:-1)[0]||{Text};
-  PUB.announcements=PANN.filter(x=>!x.Until||x.Until>=todayStr()); renderJoin();
-  modal(`${mhead('Posted ✓')}<p>Everybody will see it at the top of their page.</p><a class="btn ok block big" target="_blank" href="${annWa(a)}" onclick="closeModal()">Send it on WhatsApp too</a><button class="btn ghost block mt8" onclick="closeModal()">Not now</button>`);
+  renderJoin(); toast('Sent ⏳ — waiting for the service leader’s approval','ok');
 }
-async function teamDel(id,b){ if(!confirm('Delete this announcement?')) return; PANN=await run(b,()=>api('teamDeleteAnnouncement',{key:ME.ID,ID:id},false)); PUB.announcements=PANN.filter(x=>!x.Until||x.Until>=todayStr()); renderJoin(); }
+async function teamDel(id,b){ if(!confirm('Delete this announcement?')) return; PANN=await run(b,()=>api('teamDeleteAnnouncement',{key:ME.ID,ID:id},false)); PUB.announcements=PANN.filter(x=>(!x.Until||x.Until>=todayStr())&&!['Pending','Rejected'].includes(x.Status)); renderJoin(); }
 let PAPPR=null;
 function joinAppr(){
   if(!PAPPR){ api('approvals',{key:ME.ID},false).then(r=>{PAPPR=r;renderJoin();}).catch(e=>toast(e.message,'err')); return '<div class="card empty">Loading requests…</div>'; }
