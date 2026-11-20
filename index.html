@@ -34,18 +34,21 @@ header .t1{font-weight:700;font-size:16px;line-height:1.1}
 header .t2{font-size:12px;opacity:.7}
 header .sp{flex:1}
 .iconbtn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-size:13px;font-weight:600}
-main{max-width:980px;margin:0 auto;padding:16px 14px 100px}
-nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
-nav.tabs button{flex:1;min-width:0;background:none;border:0;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;color:var(--muted);cursor:pointer;font-weight:600;white-space:nowrap;overflow:hidden}
-nav.tabs button .ic{font-size:19px;line-height:1}
-nav.tabs button.on{color:var(--accent)}
-@media(min-width:900px){nav.tabs{top:0;bottom:auto;left:auto;right:16px;background:transparent;border:0;width:auto;gap:4px;padding:10px 0}nav.tabs button{flex:none;flex-direction:row;color:#cbd5e1;font-size:13px;padding:8px 10px;border-radius:10px}nav.tabs button.on{background:rgba(255,255,255,.12);color:#fff}header.top{padding-right:640px}main{padding-bottom:40px}}
+main{max-width:980px;margin:0 auto;padding:16px 14px 40px}
+nav.tabs{position:sticky;top:var(--hh,60px);z-index:19;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 8px rgba(15,23,42,.05);display:flex;overflow-x:auto;scrollbar-width:none;padding:0 6px}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{flex:1 0 auto;min-width:76px;background:none;border:0;border-bottom:3px solid transparent;padding:10px 8px 9px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;color:var(--muted);cursor:pointer;font-weight:700;white-space:nowrap}
+nav.tabs button .ic{font-size:24px;line-height:1}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+@media(min-width:900px){nav.tabs{justify-content:center}nav.tabs button{flex:0 0 auto;min-width:110px;flex-direction:row;gap:8px;font-size:14px;padding:14px 16px}nav.tabs button .ic{font-size:20px}}
 h2{font-size:20px;margin:4px 0 12px;letter-spacing:-.3px}
 h3{font-size:15px;margin:0 0 10px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .between{justify-content:space-between}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:14px;margin-bottom:12px}
 .grid{display:grid;gap:12px}
+.grid>*{min-width:0}
+html,body{overflow-x:hidden}
 .g2{grid-template-columns:repeat(2,1fr)} .g4{grid-template-columns:repeat(2,1fr)}
 @media(min-width:700px){.g4{grid-template-columns:repeat(4,1fr)}.md2{grid-template-columns:1fr 1fr}}
 .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px}
@@ -115,10 +118,10 @@ details summary{cursor:pointer;font-weight:600;padding:6px 0}
 .pcard{border:1.5px dashed #94a3b8;border-radius:14px;padding:12px;text-align:center;background:#fff;break-inside:avoid}
 .pcard .qrbox{padding:4px}
 /* servant page tabs (top) */
-.jtabs{position:sticky;top:var(--hh,60px);z-index:15;background:rgba(244,245,248,.96);backdrop-filter:blur(8px);margin:-16px -14px 14px;padding:6px 8px 0;border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.jtabs{position:sticky;top:var(--hh,60px);z-index:15;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.05);margin:-16px -14px 14px;padding:6px 8px 0;border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
 .jtabs::-webkit-scrollbar{display:none}
-.jtabs button{flex:1 0 auto;min-width:66px;background:none;border:0;padding:6px 6px 9px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;font-weight:700;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
-.jtabs button .ic{font-size:20px;line-height:1.1}
+.jtabs button{flex:1 0 auto;min-width:76px;background:none;border:0;padding:10px 8px 9px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.jtabs button .ic{font-size:24px;line-height:1}
 .jtabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
 .jtabs button .dot{display:inline-block;min-width:16px;padding:0 4px;border-radius:99px;background:var(--accent);color:#fff;font-size:10px;line-height:16px;margin-left:2px}
 img.av{object-fit:cover;background:#e5e7eb}
@@ -145,8 +148,8 @@ img.av{object-fit:cover;background:#e5e7eb}
   <span id="netBadge" class="badge hidden" style="background:#fbbf24;color:#000"></span>
   <button class="iconbtn hidden" id="refreshBtn" onclick="reload(true)">↻</button>
 </header>
-<main id="main"><div class="empty">Loading…</div></main>
 <nav class="tabs hidden" id="tabs"></nav>
+<main id="main"><div class="empty">Loading…</div></main>
 <div id="modalRoot"></div>
 <div id="toast" class="hidden"></div>
 <div id="scanner" class="hidden">
