@@ -817,7 +817,7 @@ function installTriggers() {
 /* ======================= ANNOUNCEMENTS ======================= */
 function activeAnnouncements_() {
   const t = today_();
-  return readTable_('Announcements').filter(a => a.Text && (!a.Until || a.Until >= t) && ['Pending', 'Rejected'].indexOf(a.Status) < 0)
+  return readTable_('Announcements').filter(a => (a.Text || a.Images) && (!a.Until || a.Until >= t) && ['Pending', 'Rejected'].indexOf(a.Status) < 0)
     .sort((a, b) => a.CreatedAt < b.CreatedAt ? 1 : -1).map(a => ({ ID: a.ID, Text: a.Text, CreatedAt: a.CreatedAt, Images: a.Images || '' }));
 }
 function saveAnnouncement_(d) {

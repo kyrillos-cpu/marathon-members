@@ -976,7 +976,7 @@ function calButtons(m, find){
 
 /* =================== ANNOUNCEMENTS =================== */
 function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function annActive(){ const t=todayStr(); return (S.announcements||[]).filter(a=>a.Text&&(!a.Until||a.Until>=t)&&!['Pending','Rejected'].includes(a.Status)).sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
+function annActive(){ const t=todayStr(); return (S.announcements||[]).filter(a=>(a.Text||a.Images)&&(!a.Until||a.Until>=t)&&!['Pending','Rejected'].includes(a.Status)).sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
 function annPending(){ return (S.announcements||[]).filter(a=>a.Status==='Pending').sort((a,b)=>a.CreatedAt<b.CreatedAt?1:-1); }
 async function annReview(id, status){
   S.announcements=await run(null,()=>api('reviewAnnouncement',{ID:id, Status:status})); render();
