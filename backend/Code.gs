@@ -21,7 +21,7 @@ const SHEETS = {
   Signups:    ['MissionID','MemberID','Team','Status','SignedAt','Note'],
   Bookings:   ['Key','Eparchy','Type','Date','EndDate','Contact','Phone','Status','MissionID','SyncedAt','Coordinators'],
   Library:    ['ID','Category','Title','Link','Note','AddedAt'],
-  Announcements: ['ID','Text','Until','CreatedAt','By','Status'],
+  Announcements: ['ID','Text','Until','CreatedAt','By','Status','Images'],
   Settings:   ['Key','Value']
 };
 
@@ -74,7 +74,7 @@ function route_(action, d, code) {
     myTeam: myTeam_, setMyEmail: setMyEmail_, uploadPhoto: d => { const m = findMember_(d.key); if (!m || m.Status === 'Inactive') throw new Error('Member not found'); return savePhoto_(m, d.data); }, approvals: approvals_, decide: decide_,
     teamAnnouncements: d => { checkAnnouncer_(d); return readTable_('Announcements'); },
     teamSaveAnnouncement: d => { const m = checkAnnouncer_(d); return saveAnnouncement_(Object.assign({}, d, { By: m.Name })); },
-    teamDeleteAnnouncement: d => { checkAnnouncer_(d); deleteWhere_('Announcements', r => r.ID === d.ID); return readTable_('Announcements'); },
+    teamDeleteAnnouncement: d => { checkAnnouncer_(d); return deleteAnnouncement_(d.ID); },
     joinData: d => ({ me: lookupMember_(d), pub: publicMissions_() }),
     library: d => { const m = findMember_(d.key); if (!m || m.Status === 'Inactive') throw new Error('Member not found'); return getLibrary_(); }
   };
@@ -90,7 +90,7 @@ function route_(action, d, code) {
     setMissionCoord: d => { upsert_('Missions', r => r.ID === d.ID, { CoordName: d.name || '', CoordPhone: d.phone || '' }); calMission_(d.ID); return readTable_('Missions').filter(x => x.ID === d.ID)[0]; },
     setMemberPhoto: d => { const m = readTable_('Members').filter(x => x.ID === d.ID)[0]; if (!m) throw new Error('Member not found'); return savePhoto_(m, d.data); },
     saveAnnouncement: saveAnnouncement_,
-    reviewAnnouncement: d => { upsert_('Announcements', r => r.ID === d.ID, { Status: d.Status === 'Approved' ? 'Approved' : 'Rejected' }); return readTable_('Announcements'); }, deleteAnnouncement: d => { deleteWhere_('Announcements', r => r.ID === d.ID); return readTable_('Announcements'); }
+    reviewAnnouncement: d => { upsert_('Announcements', r => r.ID === d.ID, { Status: d.Status === 'Approved' ? 'Approved' : 'Rejected' }); return readTable_('Announcements'); }, deleteAnnouncement: d => deleteAnnouncement_(d.ID)
   };
   // read-only actions don't wait for the write lock (faster loading)
   const READ_ONLY = ['teamAnnouncements', 'approvals', 'joinData', 'ping', 'publicMissions', 'lookupMember', 'memberCard', 'myTeam', 'library', 'login', 'bootstrap', 'getLibrary'];
@@ -818,13 +818,25 @@ function installTriggers() {
 function activeAnnouncements_() {
   const t = today_();
   return readTable_('Announcements').filter(a => a.Text && (!a.Until || a.Until >= t) && ['Pending', 'Rejected'].indexOf(a.Status) < 0)
-    .sort((a, b) => a.CreatedAt < b.CreatedAt ? 1 : -1).map(a => ({ ID: a.ID, Text: a.Text, CreatedAt: a.CreatedAt }));
+    .sort((a, b) => a.CreatedAt < b.CreatedAt ? 1 : -1).map(a => ({ ID: a.ID, Text: a.Text, CreatedAt: a.CreatedAt, Images: a.Images || '' }));
 }
 function saveAnnouncement_(d) {
   const text = String(d.Text || '').trim();
-  if (!text) throw new Error('Write the announcement first');
-  if (d.ID && readTable_('Announcements').some(a => a.ID === d.ID)) upsert_('Announcements', r => r.ID === d.ID, { Text: text, Until: d.Until || '' });
-  else writeObj_('Announcements', { ID: nextId_('Announcements', 'A-', 3), Text: text, Until: d.Until || '', CreatedAt: now_(), By: d.By || 'Leader', Status: d.By ? 'Pending' : 'Approved' });
+  const cur = d.ID ? readTable_('Announcements').filter(a => a.ID === d.ID)[0] : null;
+  const keep = cur ? splitList_(d.keepImages !== undefined ? d.keepImages : cur.Images) : [];
+  if (!text && !(d.images || []).length && !keep.length) throw new Error('Write the announcement first');
+  const imgs = (d.images || []).slice(0, 4).map((b, i) => saveImage_(b, 'announcement_' + Date.now() + '_' + i + '.jpg'));
+  if (cur) {
+    splitList_(cur.Images).filter(id => keep.indexOf(id) < 0).forEach(trashFile_);
+    upsert_('Announcements', r => r.ID === d.ID, { Text: text, Until: d.Until || '', Images: keep.concat(imgs).join(',') });
+  } else {
+    writeObj_('Announcements', { ID: nextId_('Announcements', 'A-', 3), Text: text, Until: d.Until || '', CreatedAt: now_(), By: d.By || 'Leader', Status: d.By ? 'Pending' : 'Approved', Images: imgs.join(',') });
+  }
+  return readTable_('Announcements');
+}
+function deleteAnnouncement_(id) {
+  readTable_('Announcements').filter(r => r.ID === id).forEach(r => splitList_(r.Images).forEach(trashFile_));
+  deleteWhere_('Announcements', r => r.ID === id);
   return readTable_('Announcements');
 }
 
@@ -880,6 +892,15 @@ function photosFolder_() {
   const it = DriveApp.getFoldersByName('Marathon Members Photos');
   return it.hasNext() ? it.next() : DriveApp.createFolder('Marathon Members Photos');
 }
+function saveImage_(b64, name) {
+  b64 = String(b64 || '').replace(/^data:image\/\w+;base64,/, '');
+  if (!b64) throw new Error('No photo');
+  if (b64.length > 3500000) throw new Error('Photo is too big');
+  const file = photosFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg', name));
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getId();
+}
+function trashFile_(id) { if (!id) return; try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {} }
 function savePhoto_(m, b64) {
   b64 = String(b64 || '').replace(/^data:image\/\w+;base64,/, '');
   if (!b64) throw new Error('No photo');
