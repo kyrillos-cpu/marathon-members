@@ -439,8 +439,11 @@ function vDash(){
 async function quickSession(type){
   const t=todayStr();
   let s = S.sessions.find(x=>x.Type===type && x.Date===t);
-  if(!s){ s = await run(null, ()=>api('saveSession',{Type:type, Date:t, StartTime: type==='Sunday Meeting'?'':'' , Title:''})); S.sessions.push(s); }
-  go('session',{sessionId:s.ID}); openScanner();
+  if(s){ go('session',{sessionId:s.ID}); openScanner(); return; }
+  // open the camera right away while the session is created in the background
+  V.sessionId=null; openScanner(type);
+  try{ s = await api('saveSession',{Type:type, Date:t, StartTime:'', Title:''}); S.sessions.push(s); V.sessionId=s.ID; const open=scanOpen; const pre=preScans.slice(); go('session',{sessionId:s.ID}); if(open){ $('#scanner').classList.remove('hidden'); preScans=pre; scanCount(); flushPre(); } }
+  catch(e){ toast(e.message||'Could not create the session','err'); closeScanner(); }
 }
 
 /* =================== MEMBERS =================== */
@@ -661,23 +664,46 @@ function copyText(t){ navigator.clipboard.writeText(t).then(()=>toast('Copied �
 /* ---- Scanner ---- */
 let scanner=null, lastScan={id:null,t:0}, actx=null;
 function beep(ok=true){ try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); const o=actx.createOscillator(), g=actx.createGain(); o.frequency.value=ok?880:220; o.connect(g); g.connect(actx.destination); g.gain.value=.15; o.start(); o.stop(actx.currentTime+(ok?.12:.3)); }catch(e){} if(navigator.vibrate) navigator.vibrate(ok?60:[80,60,80]); }
-function scanCount(){ const s=S.sessions.find(x=>x.ID===V.sessionId); $('#scanTitle').textContent=`${s.Title||s.Type} · ${fmtD(s.Date,false)}`; $('#scanCount').textContent=`${S.attendance.filter(a=>a.SessionID===s.ID).length} checked in${getQ().length?' · '+getQ().length+' waiting for internet':''}`; }
+let preScans=[], scanOpen=false;
+function scanCount(){ const s=S.sessions.find(x=>x.ID===V.sessionId); if(!s){ $('#scanTitle').textContent='Starting session…'; $('#scanCount').textContent=preScans.length?preScans.length+' scanned':''; return; } $('#scanTitle').textContent=`${s.Title||s.Type} · ${fmtD(s.Date,false)}`; $('#scanCount').textContent=`${S.attendance.filter(a=>a.SessionID===s.ID).length} checked in${getQ().length?' · '+getQ().length+' waiting for internet':''}`; }
+async function flushPre(){ const l=preScans; preScans=[]; for(const id of l) await doCheckin(V.sessionId, id, 'QR'); scanCount(); }
+async function onScanText(text){
+  const res=$('#scanRes'); const id = extractId(text)||text; const now=Date.now();
+  if(lastScan.id===id && now-lastScan.t<3000) return; lastScan={id,t:now};
+  let r;
+  if(!V.sessionId){ const m=findMemberLocal(id); if(!m) r={type:'err',msg:'Unknown QR code'}; else if(preScans.includes(m.ID)) r={type:'warn',msg:`${m.Name} — already scanned`}; else { preScans.push(m.ID); r={type:'ok',msg:`✓ ${m.Name}`}; } }
+  else r = await doCheckin(V.sessionId, id, 'QR');
+  res.className=r.type; res.textContent=r.msg; beep(r.type==='ok'); scanCount();
+  clearTimeout(res._h); res._h=setTimeout(()=>{res.className=''; res.textContent='Ready for next…';}, 1500);
+}
+let nativeLoop=null;
+async function startNative(){
+  // fastest path: the phone's built-in QR detector (Android Chrome)
+  if(!('BarcodeDetector' in window)) return false;
+  try{ const f=await BarcodeDetector.getSupportedFormats(); if(!f.includes('qr_code')) return false; }catch(e){ return false; }
+  const det=new BarcodeDetector({formats:['qr_code']});
+  const stream=await navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}});
+  try{ const tr=stream.getVideoTracks()[0], c=tr.getCapabilities?tr.getCapabilities():{}; if(c.focusMode&&c.focusMode.includes('continuous')) await tr.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){}
+  const v=document.createElement('video'); v.setAttribute('playsinline',''); v.muted=true; v.srcObject=stream; v.style.cssText='width:100%;display:block;border-radius:12px';
+  if(!scanOpen){ stream.getTracks().forEach(t=>t.stop()); return true; }
+  $('#reader').innerHTML=''; $('#reader').appendChild(v); await v.play();
+  let busy=false; nativeLoop={stream, on:true};
+  const tick=async()=>{ if(!nativeLoop||!nativeLoop.on) return;
+    if(!busy && v.readyState>=2){ busy=true; try{ const codes=await det.detect(v); if(codes.length) await onScanText(codes[0].rawValue); }catch(e){} busy=false; }
+    requestAnimationFrame(tick); };
+  requestAnimationFrame(tick); return true;
+}
 async function openScanner(){
-  if(!V.sessionId) return;
-  $('#scanner').classList.remove('hidden'); scanCount();
+  scanOpen=true; $('#scanner').classList.remove('hidden'); scanCount();
   const res=$('#scanRes'); res.className=''; res.textContent='Point the camera at a member QR';
   try{
-    scanner = new Html5Qrcode('reader');
-    await scanner.start({facingMode:'environment'}, {fps:12, qrbox:(w,h)=>{const s=Math.floor(Math.min(w,h)*0.7);return {width:s,height:s};}, aspectRatio:1}, async text=>{
-      const id = extractId(text)||text; const now=Date.now();
-      if(lastScan.id===id && now-lastScan.t<3500) return; lastScan={id,t:now};
-      const r = await doCheckin(V.sessionId, id, 'QR');
-      res.className=r.type; res.textContent=r.msg; beep(r.type==='ok'); scanCount();
-      clearTimeout(res._h); res._h=setTimeout(()=>{res.className=''; res.textContent='Ready for next…';}, 2500);
-    }, ()=>{});
+    if(await startNative()) return;
+    scanner = new Html5Qrcode('reader',{verbose:false, formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE], experimentalFeatures:{useBarCodeDetectorIfSupported:true}});
+    await scanner.start({facingMode:'environment'}, {fps:25, disableFlip:true, qrbox:(w,h)=>{const s=Math.floor(Math.min(w,h)*0.85);return {width:s,height:s};}, aspectRatio:1,
+      videoConstraints:{facingMode:'environment', width:{ideal:1280}, height:{ideal:720}}}, text=>onScanText(text), ()=>{});
   }catch(e){ res.className='err'; res.textContent='Camera error: '+(e.message||e)+' — allow camera access'; }
 }
-async function closeScanner(){ try{ if(scanner){ await scanner.stop(); scanner.clear(); } }catch(e){} scanner=null; $('#scanner').classList.add('hidden'); render(); }
+async function closeScanner(){ try{ if(nativeLoop){ nativeLoop.on=false; nativeLoop.stream.getTracks().forEach(t=>t.stop()); $('#reader').innerHTML=''; } }catch(e){} nativeLoop=null; try{ if(scanner){ await scanner.stop(); scanner.clear(); } }catch(e){} scanner=null; preScans=[]; scanOpen=false; $('#scanner').classList.add('hidden'); render(); }
 
 /* =================== MISSIONS =================== */
 function missionCoords(m){ const b=(S.bookings||[]).find(x=>x.MissionID===m.ID); try{ return JSON.parse(b&&b.Coordinators||'[]'); }catch(e){ return []; } }
