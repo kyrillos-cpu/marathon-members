@@ -61,6 +61,7 @@ function doPost(e) {
 }
 function respond_(req) {
   let out;
+  try { ensureAbsentTrigger_(); } catch (e) { Logger.log(e); }
   try { out = { ok: true, data: route_(req.action, req.data || {}, req.code) }; }
   catch (err) { out = { ok: false, error: String(err && err.message ? err.message : err) }; }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
@@ -802,6 +803,55 @@ function dailyReminder() {
     });
   });
 }
+/* ======================= ABSENT LIST (every Monday morning) ======================= */
+const ABSENT_TAB = 'Absent Sunday';
+/** Rebuilds the "Absent Sunday" tab from the latest Sunday Meeting attendance. */
+function absentReport() {
+  const t = today_();
+  const sessions = readTable_('Sessions').filter(x => x.Type === 'Sunday Meeting' && x.Date && x.Date <= t)
+    .sort((a, b) => a.Date < b.Date ? 1 : -1);
+  let sh = ss_().getSheetByName(ABSENT_TAB);
+  if (!sh) sh = ss_().insertSheet(ABSENT_TAB);
+  sh.clear();
+  if (!sessions.length) { sh.getRange(1, 1).setValue('No Sunday meeting yet'); return; }
+  const last = sessions[0];
+  const att = readTable_('Attendance');
+  const bySession = {};
+  att.forEach(a => { (bySession[a.SessionID] = bySession[a.SessionID] || {})[a.MemberID] = a.Status || 'Present'; });
+  const here = bySession[last.ID] || {};
+  const came = st => st === 'Present' || st === 'Late';
+  const members = readTable_('Members').filter(m => m.Status !== 'Inactive' && m.Name && (m.JoinDate || '') <= last.Date);
+  const rows = members.filter(m => !came(here[m.ID])).map(m => {
+    let streak = 0;
+    for (const s of sessions) { if ((m.JoinDate || '') > s.Date) break; if (came((bySession[s.ID] || {})[m.ID])) break; streak++; }
+    const lastSeen = sessions.filter(s => came((bySession[s.ID] || {})[m.ID]))[0];
+    return [m.Name, m.Phone || '', splitList_(m.Teams).join(', '), here[m.ID] === 'Excused' ? 'Excused' : 'Absent',
+      streak, lastSeen ? lastSeen.Date : '—'];
+  }).sort((a, b) => (a[3] === b[3] ? b[4] - a[4] : (a[3] === 'Absent' ? -1 : 1)));
+  const presentN = members.length - rows.length;
+  sh.getRange(1, 1).setValue('Sunday meeting ' + last.Date + ' — ' + rows.length + ' did not attend (out of ' + members.length + ' active, ' + presentN + ' attended)')
+    .setFontWeight('bold').setFontSize(12);
+  sh.getRange(2, 1).setValue('Updated automatically every Monday morning · last update ' + now_()).setFontColor('#64748b');
+  const head = ['#', 'Name', 'Phone', 'Teams', 'Status', 'Sundays missed in a row', 'Last attended'];
+  sh.getRange(4, 1, 1, head.length).setValues([head]).setFontWeight('bold').setBackground('#eef2ff');
+  if (rows.length) {
+    sh.getRange(5, 3, rows.length, 1).setNumberFormat('@');
+    sh.getRange(5, 1, rows.length, head.length).setValues(rows.map((r, i) => [i + 1].concat(r)));
+    rows.forEach((r, i) => { if (r[3] === 'Absent' && r[4] >= 3) sh.getRange(5 + i, 1, 1, head.length).setBackground('#fee2e2'); });
+  }
+  sh.setFrozenRows(4);
+  sh.autoResizeColumns(1, head.length);
+}
+/** Makes sure the Monday-morning trigger exists (runs once, automatically). */
+function ensureAbsentTrigger_() {
+  const pr = PropertiesService.getScriptProperties();
+  if (pr.getProperty('ABSENT_TRIGGER') === '1') return;
+  ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'absentReport') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('absentReport').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone(tz_()).create();
+  pr.setProperty('ABSENT_TRIGGER', '1');
+  try { absentReport(); } catch (e) { Logger.log(e); }
+}
+
 /** Run ONCE from the editor: hourly bookings sync + evening reminder emails + creates the calendar. */
 function installTriggers() {
   ScriptApp.getProjectTriggers().forEach(t => { if (['autoSync', 'dailyReminder'].indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t); });
