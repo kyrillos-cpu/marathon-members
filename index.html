@@ -376,16 +376,45 @@ async function doLogin(f){
 function logout(){ localStorage.removeItem('mm_code'); localStorage.removeItem('mm_cache'); CODE=''; S=null; location.href=baseUrl(); }
 
 /* =================== NAV =================== */
-const TABS = [['dash','◎','Home'],['members','👥','Members'],['att','▣','Check-in'],['missions','⚑','Missions'],['library','📚','Library'],['teams','◈','Teams'],['settings','⚙','Settings']];
+const TABS = [['dash','◎','Home'],['members','👥','Members'],['att','▣','Check-in'],['absent','🚫','Absent'],['missions','⚑','Missions'],['library','📚','Library'],['teams','◈','Teams'],['settings','⚙','Settings']];
 function go(v, extra={}){ Object.assign(V, {view:v}, extra); render(); window.scrollTo(0,0); }
 function render(){
   if(!S) return;
   $('#tabs').innerHTML = TABS.map(([k,ic,l])=>`<button class="${(V.view===k||(V.view==='session'&&k==='att')||(V.view==='print'&&k==='members'))?'on':''}" onclick="go('${k}')"><span class="ic">${ic}</span>${l}</button>`).join('');
-  const f = {dash:vDash, members:vMembers, att:vAttendance, session:vSession, missions:vMissions, teams:vTeams, settings:vSettings, print:vPrint, library:vLibrary}[V.view] || vDash;
+  const f = {dash:vDash, members:vMembers, att:vAttendance, session:vSession, missions:vMissions, teams:vTeams, settings:vSettings, print:vPrint, library:vLibrary, absent:vAbsent}[V.view] || vDash;
   $('#main').innerHTML = f();
   saveCache();
   if(V.view==='print') document.querySelectorAll('[data-qr]').forEach(el=>qrInto(el, el.dataset.qr, 150));
 }
+
+/* =================== ABSENT (latest Sunday meeting) =================== */
+function vAbsent(){
+  const t=todayStr();
+  const suns=S.sessions.filter(s=>s.Type==='Sunday Meeting'&&s.Date&&s.Date<=t).sort((a,b)=>a.Date<b.Date?1:-1);
+  if(!suns.length) return `<h2>Absent on Sunday</h2><div class="card"><div class="empty">No Sunday meeting recorded yet</div></div>`;
+  const sel=suns.find(x=>x.ID===V.absSid)||suns[0], idx=suns.indexOf(sel), older=suns.slice(idx);
+  const by={}; S.attendance.forEach(a=>{ (by[a.SessionID]=by[a.SessionID]||{})[a.MemberID]=a.Status||'Present'; });
+  const came=st=>st==='Present'||st==='Late', here=by[sel.ID]||{};
+  const mem=S.members.filter(m=>m.Status!=='Inactive'&&m.Name&&(m.JoinDate||'').slice(0,10)<=sel.Date);
+  const rows=mem.filter(m=>!came(here[m.ID])).map(m=>{
+    let streak=0; for(const x of older){ if((m.JoinDate||'').slice(0,10)>x.Date) break; if(came((by[x.ID]||{})[m.ID])) break; streak++; }
+    const seen=older.find(x=>came((by[x.ID]||{})[m.ID]));
+    return {m, exc:here[m.ID]==='Excused', streak, seen:seen?seen.Date:''};
+  }).sort((a,b)=>a.exc!==b.exc?(a.exc?1:-1):b.streak-a.streak||a.m.Name.localeCompare(b.m.Name));
+  const abs=rows.filter(r=>!r.exc).length;
+  const msg=m=>`Hi ${(m.Name||'').split(' ')[0]} 👋 we missed you at the Sunday meeting 🙏 hope you're doing well — see you next Sunday!`;
+  return `<h2>Absent on Sunday</h2>
+  <div class="card"><label class="f">Meeting</label><select class="in" onchange="V.absSid=this.value;render()">${suns.map(x=>`<option value="${x.ID}" ${x.ID===sel.ID?'selected':''}>${fmtD(x.Date)}</option>`).join('')}</select>
+    <div class="grid g2 mt12"><div class="card kpi mb0"><div class="l">Absent</div><div class="v" style="color:var(--err)">${abs}</div></div><div class="card kpi mb0"><div class="l">Attended</div><div class="v">${mem.length-rows.length} <span class="small muted">/ ${mem.length}</span></div></div></div>
+    <button class="btn ghost block mt12" onclick="copyAbsent('${sel.ID}')">📋 Copy the list</button></div>
+  <div class="card"><div class="list">${rows.map(r=>`<div class="it" style="cursor:default${r.streak>=3&&!r.exc?';background:#fef2f2':''}">${avatar(r.m)}<div class="grow"><div class="nm">${esc(r.m.Name)} ${r.exc?'<span class="pill p-Pending">Excused</span>':''}</div>
+    <div class="sub">${r.exc?'':`<b style="color:${r.streak>=3?'var(--err)':'inherit'}">${r.streak} Sunday${r.streak>1?'s':''} in a row</b> · `}Last attended: ${r.seen?fmtD(r.seen,false):'never'}</div>
+    <div class="sub">${esc(split(r.m.Teams).join(', '))}</div></div>
+    ${r.m.Phone?`<div class="row" style="gap:6px"><a class="btn sm ghost" href="tel:${esc(String(r.m.Phone).replace(/[^\d+]/g,''))}">📞</a><a class="btn sm ok" target="_blank" href="${waLink(r.m.Phone,msg(r.m))}">WhatsApp</a></div>`:''}</div>`).join('')||'<div class="empty">Everyone attended 🎉</div>'}</div></div>`;
+}
+function copyAbsent(sid){ const s=S.sessions.find(x=>x.ID===sid); const by={}; S.attendance.filter(a=>a.SessionID===sid).forEach(a=>by[a.MemberID]=a.Status||'Present');
+  const l=S.members.filter(m=>m.Status!=='Inactive'&&m.Name&&(m.JoinDate||'').slice(0,10)<=s.Date&&!['Present','Late'].includes(by[m.ID]));
+  copyText(`Absent – Sunday meeting ${fmtD(s.Date)} (${l.length}):\n`+l.map((m,i)=>`${i+1}. ${m.Name}${by[m.ID]==='Excused'?' (excused)':''}`).join('\n')); }
 
 /* =================== DASHBOARD =================== */
 function vDash(){
@@ -419,7 +448,7 @@ function vDash(){
         <button class="btn accent block big" onclick="quickSession('Sunday Meeting')">▣ Sunday Meeting — scan now</button>
         <div class="grid g2 mt8"><button class="btn ghost" onclick="quickSession('Training')">Training day</button><button class="btn ghost" onclick="quickSession('Carnival')">Carnival day</button></div>
       </div>
-      <div class="card"><h3>Last Sunday meeting</h3>${lastSunHtml}</div>
+      <div class="card" onclick="go('absent')" style="cursor:pointer"><div class="row between"><h3>Last Sunday meeting</h3><span class="btn sm ghost">Who was absent →</span></div>${lastSunHtml}</div>
       <div class="card"><div class="row between"><h3>Upcoming missions</h3><button class="btn sm ghost" onclick="go('missions')">All</button></div>
         ${upcoming.slice(0,4).map(missionRow).join('') || '<div class="sub">No upcoming missions</div>'}</div>
     </div>
