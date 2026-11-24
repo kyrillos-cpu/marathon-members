@@ -15,7 +15,7 @@ const ADMIN_CODE = 'CHANGE-ME';   // leaders' access code
 const SHEETS = {
   Members:    ['ID','Name','Phone','Teams','Role','Church','JoinDate','Status','Notes','CreatedAt','Email','Photo'],
   Teams:      ['Name','Color','Lead','CreatedAt'],
-  Sessions:   ['ID','Type','Title','Date','StartTime','MissionID','Notes','CreatedAt'],
+  Sessions:   ['ID','Type','Title','Date','StartTime','MissionID','Notes','CreatedAt', 'Recap'],
   Attendance: ['SessionID','MemberID','Time','Status','Rating','Method','Note'],
   Missions:   ['ID','Title','Type','Eparchy','Date','EndDate','Location','SlotsNeeded','Status','Source','BookingKey','Notes','CreatedAt','EventID','CoordName','CoordPhone'],
   Signups:    ['MissionID','MemberID','Team','Status','SignedAt','Note'],
@@ -308,6 +308,7 @@ function splitList_(s) { return String(s || '').split(',').map(x => x.trim()).fi
 function saveSession_(d) {
   if (!d.Type || !d.Date) throw new Error('Type and date are required');
   const patch = { Type: d.Type, Title: d.Title || '', Date: d.Date, StartTime: d.StartTime || '', MissionID: d.MissionID || '', Notes: d.Notes || '' };
+  if (d.Recap !== undefined) patch.Recap = String(d.Recap || '');
   if (d.ID && readTable_('Sessions').some(s => s.ID === d.ID)) return upsert_('Sessions', r => r.ID === d.ID, patch);
   patch.ID = nextId_('Sessions', 'S-', 4); patch.CreatedAt = now_();
   return writeObj_('Sessions', patch);

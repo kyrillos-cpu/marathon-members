@@ -387,6 +387,25 @@ function render(){
   if(V.view==='print') document.querySelectorAll('[data-qr]').forEach(el=>qrInto(el, el.dataset.qr, 150));
 }
 
+/* =================== MEETING RECAP =================== */
+function recapBox(s){
+  return `<div class="card" id="recap"><h3>📝 Meeting recap</h3><div class="sub">What happened in the meeting — it is added to the "we missed you" WhatsApp message for everyone who was absent.</div>
+    <textarea class="in mt8" id="recapTxt" rows="6" dir="auto" placeholder="e.g. Fr. talked about …  We prepared the carnival games …  Next Sunday we start at 7 PM">${esc(s.Recap||'')}</textarea>
+    <button class="btn accent block mt8" onclick="saveRecap('${s.ID}',this)">Save recap</button></div>`;
+}
+async function saveRecap(sid, btn){
+  const s=S.sessions.find(x=>x.ID===sid); const txt=$('#recapTxt').value.trim();
+  const d={ID:s.ID, Type:s.Type, Title:s.Title||'', Date:s.Date, StartTime:s.StartTime||'', MissionID:s.MissionID||'', Notes:s.Notes||'', Recap:txt};
+  const r=await run(btn, ()=>api('saveSession', d)); if(r===undefined) return;
+  s.Recap=txt; if(r&&r.Recap!==undefined) s.Recap=r.Recap; saveCache(); toast('Recap saved ✓','ok'); render();
+}
+function missedMsg(m, sess){
+  const f=(m.Name||'').split(' ')[0];
+  let t=`Hi ${f} 👋 we missed you at the Sunday meeting 🙏 hope you're doing well.`;
+  if(sess&&sess.Recap) t+=`\n\n📝 What happened on ${fmtD(sess.Date,false)}:\n${sess.Recap}`;
+  return t+`\n\nSee you next Sunday! 🤍`;
+}
+
 /* =================== ABSENT (latest Sunday meeting) =================== */
 function vAbsent(){
   const t=todayStr();
@@ -402,11 +421,12 @@ function vAbsent(){
     return {m, exc:here[m.ID]==='Excused', streak, seen:seen?seen.Date:''};
   }).sort((a,b)=>a.exc!==b.exc?(a.exc?1:-1):b.streak-a.streak||a.m.Name.localeCompare(b.m.Name));
   const abs=rows.filter(r=>!r.exc).length;
-  const msg=m=>`Hi ${(m.Name||'').split(' ')[0]} 👋 we missed you at the Sunday meeting 🙏 hope you're doing well — see you next Sunday!`;
+  const msg=m=>missedMsg(m, sel);
   return `<h2>Absent on Sunday</h2>
   <div class="card"><label class="f">Meeting</label><select class="in" onchange="V.absSid=this.value;render()">${suns.map(x=>`<option value="${x.ID}" ${x.ID===sel.ID?'selected':''}>${fmtD(x.Date)}</option>`).join('')}</select>
     <div class="grid g2 mt12"><div class="card kpi mb0"><div class="l">Absent</div><div class="v" style="color:var(--err)">${abs}</div></div><div class="card kpi mb0"><div class="l">Attended</div><div class="v">${mem.length-rows.length} <span class="small muted">/ ${mem.length}</span></div></div></div>
     <button class="btn ghost block mt12" onclick="copyAbsent('${sel.ID}')">📋 Copy the list</button></div>
+  ${recapBox(sel)}
   <div class="card"><div class="list">${rows.map(r=>`<div class="it" style="cursor:default${r.streak>=3&&!r.exc?';background:#fef2f2':''}">${avatar(r.m)}<div class="grow"><div class="nm">${esc(r.m.Name)} ${r.exc?'<span class="pill p-Pending">Excused</span>':''}</div>
     <div class="sub">${r.exc?'':`<b style="color:${r.streak>=3?'var(--err)':'inherit'}">${r.streak} Sunday${r.streak>1?'s':''} in a row</b> · `}Last attended: ${r.seen?fmtD(r.seen,false):'never'}</div>
     <div class="sub">${esc(split(r.m.Teams).join(', '))}</div></div>
@@ -658,6 +678,7 @@ function vSession(){
     <button class="btn accent block big mt12" onclick="openScanner()">📷 Scan QR codes</button>
     <div class="row mt8"><button class="btn ghost sm" onclick="sessionForm('${s.ID}')">Edit</button><button class="btn ghost sm" onclick="copyNames('${s.ID}')">Copy names</button><button class="btn danger sm" onclick="delSession('${s.ID}')">Delete</button></div>
   </div>
+  ${s.Type==='Sunday Meeting'?recapBox(s):''}
   <div class="card"><h3>Present <span class="badge">${recs.length}</span> <span class="sub" style="font-weight:400">· tap status to change · rate participation</span></h3>
   <div class="list">${recs.map(a=>{ const m=S.members.find(x=>x.ID===a.MemberID)||{Name:a.MemberID,ID:a.MemberID,Teams:''}; return `<div class="it" style="cursor:default">${avatar(m)}<div class="grow"><div class="nm">${esc(m.Name)} ${a._pending?'<span class="badge" style="background:#fef3c7">offline</span>':''}</div><div class="sub">${esc((a.Time||'').slice(11,16))} · ${esc(a.Method||'')}</div>
     <div class="rate">${[1,2,3,4,5].map(n=>`<button class="${Number(a.Rating)>=n?'on':''}" onclick="rate('${s.ID}','${m.ID}',${n})">★</button>`).join('')}</div></div>
