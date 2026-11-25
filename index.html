@@ -455,6 +455,7 @@ function vDash(){
   return `
   <h2>Welcome 👋</h2>
   ${annCard()}
+  ${cancelCard()}
   ${pendingCard()}
   <div class="grid g4">
     <div class="card kpi mb0"><div class="l">Active servants</div><div class="v">${active.length}</div></div>
@@ -861,6 +862,7 @@ function openMission(id){
   <div class="list">${sg.map(({x,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">Score <b>${(SC[mem.ID]||{}).score??'—'}</b>${x.Team?' · '+esc(x.Team):''}${x.Note?' · '+esc(x.Note):''}</div></div>
     ${x.Status==='Pending'?`<button class="btn sm ok" onclick="quickDecide('${id}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="quickDecide('${id}','${mem.ID}','Declined')">✕</button>`
       :`<select class="in" style="width:auto;padding:6px" onchange="setSignup('${id}','${mem.ID}',this.value)">${Array.from(new Set(['Pending','Confirmed','Declined','Attended','No-show',x.Status,'Removed'])).map(s=>`<option ${x.Status===s?'selected':''}>${s}</option>`).join('')}</select>`}</div>`).join('')||'<div class="sub">No one yet</div>'}</div>
+  ${(()=>{ const cl=(S.cancellations||[]).filter(c=>c.MissionID===id).sort((a,b)=>a.CancelledAt<b.CancelledAt?1:-1); return cl.length?`<h3 class="mt16" style="color:var(--err)">Cancelled (${cl.length})</h3><div class="list">${cl.map(c=>cancelRow(c,false)).join('')}</div>`:''; })()}
   <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
   <div class="grid g2 mt16">
     <button class="btn accent" onclick="missionSession('${id}')">${sess.length?'▣ Open attendance':'▣ Start attendance'}</button>
@@ -1061,6 +1063,23 @@ async function annReview(id, status){
   else toast('Rejected');
 }
 function annWa(a){ const im=split(a.Images).map(id=>'📷 https://drive.google.com/file/d/'+id+'/view').join('\n'); return 'https://wa.me/?text='+encodeURIComponent(`📣 Marathon announcement\n\n${a.Text||''}${im?'\n\n'+im:''}\n\n${joinUrl()}`); }
+/* ---- Cancellations (servants who cancelled after signing up) ---- */
+function cancelRow(c, showMission=true){
+  const mem=S.members.find(x=>x.ID===c.MemberID)||{Name:c.Name,ID:c.MemberID};
+  const was=c.PrevStatus==='Pending'?'request (not approved yet)':'sign-up ('+c.PrevStatus+')';
+  const msg=`Hi ${(mem.Name||'').split(' ')[0]} 👋 I saw you cancelled ${c.Mission||'the mission'} — is everything OK? 🙏`;
+  return `<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name||c.Name)}</div>
+    <div class="sub">${showMission?`<b>${esc(c.Mission||'')}</b>${c.MissionDate?' · '+fmtD(c.MissionDate,false):''}<br>`:''}Cancelled ${esc(was)} · ${esc((c.CancelledAt||'').slice(5,16).replace('-','/'))}</div></div>
+    ${mem.Phone?`<div class="row" style="gap:6px"><a class="btn sm ghost" href="tel:${esc(String(mem.Phone).replace(/[^\d+]/g,''))}">📞</a><a class="btn sm ok" target="_blank" href="${waLink(mem.Phone,msg)}">WhatsApp</a></div>`:''}</div>`;
+}
+function cancelCard(){
+  const l=(S.cancellations||[]).filter(c=>!c.Seen).sort((a,b)=>a.CancelledAt<b.CancelledAt?1:-1);
+  if(!l.length) return '';
+  return `<div class="card" style="border-left:4px solid var(--err)"><div class="row between"><h3 class="mb0">❌ Cancelled after signing up <span class="badge">${l.length}</span></h3><button class="btn sm ghost" onclick="seenCancels(this)">Mark as seen</button></div>
+    <div class="list mt8">${l.map(c=>cancelRow(c)).join('')}</div></div>`;
+}
+async function seenCancels(b){ const r=await run(b,()=>api('seenCancellations',{})); S.cancellations=r||(S.cancellations||[]).map(c=>Object.assign(c,{Seen:'1'})); saveCache(); render(); }
+
 function pendingCard(){
   const l=pendingList(); if(!l.length) return '';
   return `<div class="card" style="border-left:4px solid #eab308"><h3>⏳ Waiting for approval <span class="badge">${l.length}</span></h3><div class="list">

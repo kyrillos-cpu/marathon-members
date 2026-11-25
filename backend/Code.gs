@@ -19,6 +19,7 @@ const SHEETS = {
   Attendance: ['SessionID','MemberID','Time','Status','Rating','Method','Note'],
   Missions:   ['ID','Title','Type','Eparchy','Date','EndDate','Location','SlotsNeeded','Status','Source','BookingKey','Notes','CreatedAt','EventID','CoordName','CoordPhone'],
   Signups:    ['MissionID','MemberID','Team','Status','SignedAt','Note'],
+  Cancellations: ['MissionID','MemberID','Name','Mission','MissionDate','PrevStatus','SignedAt','CancelledAt','Seen'],
   Bookings:   ['Key','Eparchy','Type','Date','EndDate','Contact','Phone','Status','MissionID','SyncedAt','Coordinators'],
   Library:    ['ID','Category','Title','Link','Note','AddedAt'],
   Announcements: ['ID','Text','Until','CreatedAt','By','Status','Images'],
@@ -91,6 +92,7 @@ function route_(action, d, code) {
     setMissionCoord: d => { upsert_('Missions', r => r.ID === d.ID, { CoordName: d.name || '', CoordPhone: d.phone || '' }); calMission_(d.ID); return readTable_('Missions').filter(x => x.ID === d.ID)[0]; },
     setMemberPhoto: d => { const m = readTable_('Members').filter(x => x.ID === d.ID)[0]; if (!m) throw new Error('Member not found'); return savePhoto_(m, d.data); },
     saveAnnouncement: saveAnnouncement_,
+    seenCancellations: () => { const sh = sh_('Cancellations'); const h = headers_('Cancellations'); const col = h.indexOf('Seen') + 1; const n = sh.getLastRow() - 1; if (n > 0 && col > 0) sh.getRange(2, col, n, 1).setValues(Array(n).fill(['1'])); return readTable_('Cancellations'); },
     reviewAnnouncement: d => { upsert_('Announcements', r => r.ID === d.ID, { Status: d.Status === 'Approved' ? 'Approved' : 'Rejected' }); return readTable_('Announcements'); }, deleteAnnouncement: d => deleteAnnouncement_(d.ID)
   };
   // read-only actions don't wait for the write lock (faster loading)
@@ -228,7 +230,7 @@ function bootstrap_() {
   return {
     members: readTable_('Members'), teams: readTable_('Teams'),
     sessions: readTable_('Sessions'), attendance: readTable_('Attendance'),
-    missions: readTable_('Missions'), signups: readTable_('Signups'),
+    missions: readTable_('Missions'), signups: readTable_('Signups'), cancellations: readTable_('Cancellations'),
     bookings: readTable_('Bookings'), announcements: readTable_('Announcements'), settings: st, serverTime: now_()
   };
 }
@@ -439,7 +441,20 @@ function cancelSignup_(d) {
   if (!m) throw new Error('Member not found');
   const mission = readTable_('Missions').filter(x => x.ID === d.MissionID)[0];
   if (mission && mission.Date < today_()) throw new Error('This mission already started');
+  const sg = readTable_('Signups').filter(r => r.MissionID === d.MissionID && r.MemberID === m.ID && r.Status !== 'Attended')[0];
   deleteWhere_('Signups', r => r.MissionID === d.MissionID && r.MemberID === m.ID && r.Status !== 'Attended');
+  if (sg) {
+    // keep a record so the leader knows who cancelled
+    writeObj_('Cancellations', { MissionID: d.MissionID, MemberID: m.ID, Name: m.Name, Mission: mission ? mission.Title : d.MissionID,
+      MissionDate: mission ? mission.Date : '', PrevStatus: sg.Status, SignedAt: sg.SignedAt || '', CancelledAt: now_(), Seen: '' });
+    try {
+      const to = Session.getEffectiveUser().getEmail();
+      if (to) MailApp.sendEmail({ to: to, subject: '❌ ' + m.Name + ' cancelled: ' + (mission ? mission.Title : d.MissionID),
+        body: m.Name + ' (' + (m.Phone || m.ID) + ') cancelled their ' + (sg.Status === 'Pending' ? 'request' : 'sign-up') + ' for:\n\n' +
+          (mission ? mission.Title + '\n' + mission.Date + (mission.Location ? ' · ' + mission.Location : '') : d.MissionID) +
+          '\n\nStatus before cancelling: ' + sg.Status + '\nCancelled at: ' + now_() });
+    } catch (e) { Logger.log(e); }
+  }
   return { cancelled: true };
 }
 function memberCard_(d) {
