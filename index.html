@@ -866,6 +866,7 @@ function openMission(id){
   <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
   <div class="grid g2 mt16">
     <button class="btn accent" onclick="missionSession('${id}')">${sess.length?'▣ Open attendance':'▣ Start attendance'}</button>
+    <button class="btn ok" onclick="confirmMission('${id}')">📨 Send confirmation</button>
     <a class="btn ok" target="_blank" href="${announceLink(id)}">📣 Announce on WhatsApp</a>
     <button class="btn ghost" onclick="copyMission('${id}')">Copy team list</button>
     <button class="btn" onclick="missionForm('${id}')">Edit</button>
@@ -886,6 +887,37 @@ async function missionSession(id){
   if(!s){ s=await run(null,()=>api('saveSession',{Type: m.Type==='Training'?'Training':(m.Type==='Carnival'?'Carnival':'Other'), Date: (todayStr()>=m.Date && todayStr()<=(m.EndDate||m.Date))?todayStr():m.Date, Title:m.Title, MissionID:id})); S.sessions.push(s); }
   closeModal(); go('session',{sessionId:s.ID});
 }
+/* ---- confirmation message before a mission, to the team going ---- */
+function confSent(mid){ try{ return JSON.parse(localStorage.getItem('mm_conf_'+mid)||'[]'); }catch(e){ return []; } }
+function confNote(mid){ try{ return localStorage.getItem('mm_confnote_'+mid)||''; }catch(e){ return ''; } }
+function confDetails(m){
+  const c=missionContact(m), note=confNote(m.ID);
+  return `⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}${note?'\n🕘 '+note:''}${c&&(c.name||c.phone)?`\n📞 Local coordinator: ${c.name||''}${c.phone?' – '+c.phone:''}`:''}`;
+}
+function confMsg(m, mem, team){
+  return `Hi ${(mem.Name||'').split(' ')[0]} 👋\nJust confirming you're on the Marathon team for:\n\n${confDetails(m)}${team?'\n👥 Your team: '+team:''}\n\nPlease reply ✅ to confirm you're coming, or tell me if anything changed 🙏`;
+}
+function confirmMission(id){
+  const m=S.missions.find(x=>x.ID===id); if(!m) return;
+  const sent=confSent(id);
+  const sg=S.signups.filter(x=>x.MissionID===id&&APPROVED.includes(x.Status)).map(x=>({x, mem:S.members.find(y=>y.ID===x.MemberID)})).filter(o=>o.mem).sort((a,b)=>a.mem.Name.localeCompare(b.mem.Name));
+  modal(`${mhead('📨 Confirmation · '+esc(m.Title))}
+  <div class="sub">${fmtD(m.Date)} · ${sg.length} confirmed servant${sg.length===1?'':'s'} · sent to <b>${sg.filter(o=>sent.includes(o.mem.ID)).length}</b></div>
+  <label class="f mt12">Meeting time / place (optional — added to the message)</label>
+  <input class="in" id="confNote" dir="auto" value="${esc(confNote(id))}" placeholder="e.g. Meet at the church gate 7:30 AM" onchange="localStorage.setItem('mm_confnote_${id}',this.value.trim());confirmMission('${id}')">
+  <div class="list mt12">${sg.map(({x,mem})=>{ const done=sent.includes(mem.ID);
+    return `<div class="it" style="cursor:default${done?';opacity:.6':''}">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">${[esc(x.Team||''), done?'<b style="color:var(--ok)">✓ sent</b>':''].filter(Boolean).join(' · ')}</div></div>
+    ${mem.Phone?`<a class="btn sm ${done?'ghost':'ok'}" target="_blank" href="${waLink(mem.Phone,confMsg(m,mem,x.Team))}" onclick="confMark('${id}','${mem.ID}')">${done?'Send again':'WhatsApp'}</a>`:'<span class="sub">no phone</span>'}</div>`; }).join('')||'<div class="empty">No confirmed servants yet</div>'}</div>
+  ${sg.length?`<button class="btn ghost block mt12" onclick="copyConfGroup('${id}')">📋 Copy one message for the WhatsApp group</button>`:''}
+  <button class="btn block mt8" onclick="openMission('${id}')">← Back to mission</button>`);
+}
+function confMark(mid, memId){ const l=confSent(mid); if(!l.includes(memId)) l.push(memId); localStorage.setItem('mm_conf_'+mid, JSON.stringify(l)); setTimeout(()=>confirmMission(mid),400); }
+function copyConfGroup(id){
+  const m=S.missions.find(x=>x.ID===id);
+  const sg=S.signups.filter(x=>x.MissionID===id&&APPROVED.includes(x.Status)).map(x=>({x, mem:S.members.find(y=>y.ID===x.MemberID)})).filter(o=>o.mem);
+  copyText(`✅ Marathon mission — team confirmation\n\n${confDetails(m)}\n\n👥 The team:\n${sg.map((o,i)=>`${i+1}. ${o.mem.Name}${o.x.Team?' ('+o.x.Team+')':''}`).join('\n')}\n\nPlease reply ✅ to confirm you're coming 🙏`);
+}
+
 function announceText(m){
   const slots=Number(m.SlotsNeeded||0), n=sgCounts(m.ID).ok;
   return `📣 New Marathon mission!\n\n⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}${slots?`\n👥 We need ${slots} servants (${n} confirmed so far)`:''}${m.Notes&&!/^Confirmed booking/.test(m.Notes)?'\n📝 '+m.Notes:''}${(c=>c&&c.phone?`\n📞 Local coordinator: ${c.name} – ${c.phone}`:'')(missionContact(m))}\n\nSign up here 👇\n${joinUrl()}`;
