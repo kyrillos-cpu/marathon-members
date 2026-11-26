@@ -37,6 +37,8 @@ header .sp{flex:1}
 main{max-width:980px;margin:0 auto;padding:16px 14px 40px}
 nav.tabs{position:sticky;top:var(--hh,60px);z-index:19;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 8px rgba(15,23,42,.05);display:grid;grid-template-columns:repeat(4,1fr);padding:2px 4px}
 nav.tabs::-webkit-scrollbar{display:none}
+.pk{position:relative}.pk select{display:none}.pk ul{position:absolute;left:0;right:0;top:100%;z-index:60;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.18);max-height:260px;overflow:auto;margin:4px 0 0;padding:4px;list-style:none}
+.pk li{padding:10px 12px;border-radius:8px;cursor:pointer;font-size:15px}.pk li:hover,.pk li.on{background:#eef2ff}.pk li small{color:var(--muted);margin-left:6px}.pk li.none{color:var(--muted);cursor:default;background:none}
 nav.tabs button{min-width:0;background:none;border:0;border-bottom:3px solid transparent;padding:7px 2px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--muted);cursor:pointer;font-weight:700;white-space:nowrap}
 nav.tabs button .ic{font-size:20px;line-height:1}
 nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
@@ -197,6 +199,32 @@ function level(score){ if(score==null) return ['New','#94a3b8']; if(score>=85) r
 
 function toast(msg, type=''){ const t=$('#toast'); t.textContent=msg; t.className=type; clearTimeout(t._h); t._h=setTimeout(()=>t.className='hidden', 2600); }
 function modal(html){ $('#modalRoot').innerHTML = `<div class="ov" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`; }
+/* ---- searchable pickers: any <select class="pick"> becomes type-to-filter ---- */
+const norm=t=>String(t||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي');
+function enhancePicks(root){
+  (root||document).querySelectorAll('select.pick:not([data-pk])').forEach(sel=>{
+    sel.dataset.pk='1';
+    const w=document.createElement('div'); w.className='pk'; sel.parentNode.insertBefore(w,sel); w.appendChild(sel);
+    const inp=document.createElement('input'); inp.className='in'; inp.type='search'; inp.autocomplete='off'; inp.dir='auto';
+    inp.placeholder=sel.dataset.ph||'Type to search…'; w.insertBefore(inp,sel);
+    const ul=document.createElement('ul'); ul.hidden=true; w.appendChild(ul);
+    const opts=[...sel.options].filter(o=>o.value);
+    const cur=()=>{ const o=sel.options[sel.selectedIndex]; inp.value=o&&o.value?o.text:''; };
+    cur(); let act=0, shown=[];
+    const draw=()=>{ const q=norm(inp.value).trim().split(/\s+/).filter(Boolean);
+      shown=opts.filter(o=>{ const h=norm(o.text+' '+(o.dataset.s||'')); return q.every(w=>h.includes(w)); }).slice(0,40);
+      act=0; ul.innerHTML=shown.length?shown.map((o,i)=>`<li data-i="${i}" class="${i===0?'on':''}">${esc(o.text)}</li>`).join(''):'<li class="none">No match</li>'; ul.hidden=false; };
+    const pick=o=>{ sel.value=o.value; ul.hidden=true; cur(); sel.dispatchEvent(new Event('change',{bubbles:true})); };
+    inp.addEventListener('focus',()=>{ inp.select(); draw(); });
+    inp.addEventListener('input',draw);
+    inp.addEventListener('keydown',e=>{ if(ul.hidden) return; const li=ul.querySelectorAll('li[data-i]');
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); act=(act+(e.key==='ArrowDown'?1:-1)+li.length)%Math.max(li.length,1); li.forEach((x,i)=>x.classList.toggle('on',i===act)); }
+      else if(e.key==='Enter'){ e.preventDefault(); if(shown[act]) pick(shown[act]); } else if(e.key==='Escape'){ ul.hidden=true; cur(); } });
+    ul.addEventListener('mousedown',e=>{ const li=e.target.closest('li[data-i]'); if(li){ e.preventDefault(); pick(shown[+li.dataset.i]); } });
+    inp.addEventListener('blur',()=>setTimeout(()=>{ ul.hidden=true; if(!inp.value.trim()&&sel.querySelector('option[value=""]')){ if(sel.value){ sel.value=''; } } cur(); },150));
+  });
+}
+new MutationObserver(()=>enhancePicks()).observe(document.documentElement,{childList:true,subtree:true});
 function closeModal(){ $('#modalRoot').innerHTML=''; }
 function mhead(title){ return `<div class="hd"><h3 class="mb0" style="font-size:18px">${title}</h3><button class="x" onclick="closeModal()">✕</button></div>`; }
 function formData(id){ const f=document.getElementById(id); const o={}; new FormData(f).forEach((v,k)=>{ o[k]= o[k]!==undefined ? o[k]+', '+v : v; }); return o; }
@@ -902,7 +930,7 @@ function openMission(id){
     ${x.Status==='Pending'?`<button class="btn sm ok" onclick="quickDecide('${id}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="declineForm('${id}','${mem.ID}')">✕</button>`
       :`<select class="in" style="width:auto;padding:6px" onchange="setSignup('${id}','${mem.ID}',this.value)">${Array.from(new Set(['Pending','Confirmed','Declined','Attended','No-show',x.Status,'Removed'])).map(s=>`<option ${x.Status===s?'selected':''}>${s}</option>`).join('')}</select>`}</div>`).join('')||'<div class="sub">No one yet</div>'}</div>
   ${(()=>{ const cl=(S.cancellations||[]).filter(c=>c.MissionID===id).sort((a,b)=>a.CancelledAt<b.CancelledAt?1:-1); return cl.length?`<h3 class="mt16" style="color:var(--err)">Cancelled (${cl.length})</h3><div class="list">${cl.map(c=>cancelRow(c,false)).join('')}</div>`:''; })()}
-  <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
+  <div class="mt8"><select class="in pick" id="addSg" data-ph="+ Add a servant — type a name…" onchange="if(this.value)setSignup('${id}',this.value,'Confirmed',true)"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}" data-s="${esc((mm.Phone||'')+' '+mm.ID)}">${esc(mm.Name)}</option>`).join('')}</select></div>
   <div class="grid g2 mt16">
     <button class="btn accent" onclick="missionSession('${id}')">${sess.length?'▣ Open attendance':'▣ Start attendance'}</button>
     <button class="btn ok" onclick="confirmMission('${id}')">📨 Send confirmation</button>
@@ -986,7 +1014,7 @@ function teamForm(name){
     <input type="hidden" name="OldName" value="${esc(t.Name||'')}">
     <label class="f">Team name *</label><input class="in" name="Name" required value="${esc(t.Name||'')}">
     <div class="grid g2"><div><label class="f">Color</label><input class="in" type="color" name="Color" value="${esc(t.Color)}" style="height:44px;padding:4px"></div>
-    <div><label class="f">Team lead</label><select class="in" name="Lead"><option value="">—</option>${S.members.filter(m=>m.Status!=='Inactive').sort((a,b)=>a.Name.localeCompare(b.Name)).map(m=>`<option value="${m.ID}" ${t.Lead===m.ID?'selected':''}>${esc(m.Name)}</option>`).join('')}</select></div></div>
+    <div><label class="f">Team lead</label><select class="in pick" name="Lead" data-ph="Type a name…"><option value="">—</option>${S.members.filter(m=>m.Status!=='Inactive').sort((a,b)=>a.Name.localeCompare(b.Name)).map(m=>`<option value="${m.ID}" data-s="${esc((m.Phone||'')+' '+m.ID)}" ${t.Lead===m.ID?'selected':''}>${esc(m.Name)}</option>`).join('')}</select></div></div>
     <button class="btn accent block big mt16">Save</button>
   </form>
   ${name?`<h3 class="mt16">Members (${ms.length})</h3><div class="list">${ms.map(m=>`<div class="it" onclick="openMember('${m.ID}')">${avatar(m)}<div class="grow nm">${esc(m.Name)}</div><div class="score">${(SC[m.ID]||{}).score??'—'}</div></div>`).join('')||'<div class="sub">No members yet</div>'}</div>
