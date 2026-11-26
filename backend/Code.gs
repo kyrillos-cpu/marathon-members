@@ -207,6 +207,9 @@ function phoneKey_(p) {
   const d = String(p || '').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[^\d]/g, '');
   return d.slice(-10);
 }
+/** All e-mails are OFF unless the Settings sheet has  EMAILS = on  */
+function emailsOn_() { try { return String(settings_().EMAILS || '').toLowerCase() === 'on'; } catch (e) { return false; } }
+function mail_(o) { if (!emailsOn_()) return; MailApp.sendEmail(o); }
 function settings_() {
   const o = Object.assign({}, DEFAULT_SETTINGS);
   readTable_('Settings').forEach(r => { if (r.Key) o[r.Key] = r.Value; });
@@ -438,7 +441,7 @@ function signup_(d) {
     const st = sundayStats_(m.ID, m.JoinDate);
     if (st.flag) {
       const to = Session.getEffectiveUser().getEmail();
-      if (to) MailApp.sendEmail({ to: to, subject: '⚠️ ' + m.Name + ' requested ' + mission.Title + ' — missed Sunday meetings',
+      if (to) mail_({ to: to, subject: '⚠️ ' + m.Name + ' requested ' + mission.Title + ' — missed Sunday meetings',
         body: m.Name + ' (' + (m.Phone || m.ID) + ') requested to join:\n' + mission.Title + ' · ' + mission.Date +
           '\n\nSunday meeting: missed ' + st.missed + ' of the last ' + st.of + (st.streak >= 2 ? ' (the last ' + st.streak + ' in a row)' : '') +
           '.\n\nOpen the app to approve or decline.' });
@@ -459,7 +462,7 @@ function cancelSignup_(d) {
       MissionDate: mission ? mission.Date : '', PrevStatus: sg.Status, SignedAt: sg.SignedAt || '', CancelledAt: now_(), Seen: '' });
     try {
       const to = Session.getEffectiveUser().getEmail();
-      if (to) MailApp.sendEmail({ to: to, subject: '❌ ' + m.Name + ' cancelled: ' + (mission ? mission.Title : d.MissionID),
+      if (to) mail_({ to: to, subject: '❌ ' + m.Name + ' cancelled: ' + (mission ? mission.Title : d.MissionID),
         body: m.Name + ' (' + (m.Phone || m.ID) + ') cancelled their ' + (sg.Status === 'Pending' ? 'request' : 'sign-up') + ' for:\n\n' +
           (mission ? mission.Title + '\n' + mission.Date + (mission.Location ? ' · ' + mission.Location : '') : d.MissionID) +
           '\n\nStatus before cancelling: ' + sg.Status + '\nCancelled at: ' + now_() });
@@ -775,13 +778,17 @@ function calMission_(missionId) {
     if (m.EventID) { try { ev = calendar_().getEventById(m.EventID); } catch (e) {} }
     const emails = allEmails_();
     if (!ev) {
-      ev = calendar_().createAllDayEvent(t.title, start, end, { description: t.description, location: t.location, guests: emails.join(','), sendInvites: true });
+      ev = calendar_().createAllDayEvent(t.title, start, end, { description: t.description, location: t.location, guests: emails.join(','), sendInvites: emailsOn_() });
       try { ev.setGuestsCanSeeGuests(false); ev.setGuestsCanInviteOthers(false); ev.addPopupReminder(24 * 60); } catch (e) {}
       m.EventID = ev.getId(); writeObj_('Missions', m, row.row);
     } else {
-      ev.setTitle(t.title); ev.setLocation(t.location); ev.setDescription(t.description); ev.setAllDayDates(start, end);
+      // only touch the event when something really changed
+      if (ev.getTitle() !== t.title) ev.setTitle(t.title);
+      if ((ev.getLocation() || '') !== (t.location || '')) ev.setLocation(t.location);
+      if ((ev.getDescription() || '') !== (t.description || '')) ev.setDescription(t.description);
+      try { if (ev.getAllDayStartDate().getTime() !== start.getTime() || ev.getAllDayEndDate().getTime() !== end.getTime()) ev.setAllDayDates(start, end); } catch (e) { ev.setAllDayDates(start, end); }
       const have = ev.getGuestList().map(g => String(g.getEmail()).toLowerCase());
-      emails.filter(e => have.indexOf(e) < 0).forEach(e => ev.addGuest(e));
+      if (emailsOn_()) emails.filter(e => have.indexOf(e) < 0).forEach(e => ev.addGuest(e));
     }
   } catch (e) { Logger.log('calMission_ ' + e); }
 }
@@ -792,7 +799,7 @@ function calAddGuest_(email) {
     readTable_('Missions').filter(m => m.Status !== 'Cancelled' && (m.EndDate || m.Date) >= today_()).forEach(m => {
       if (!m.EventID) { calMission_(m.ID); return; }
       const ev = calendar_().getEventById(m.EventID);
-      if (ev && !ev.getGuestList().some(g => String(g.getEmail()).toLowerCase() === email)) ev.addGuest(email);
+      if (emailsOn_() && ev && !ev.getGuestList().some(g => String(g.getEmail()).toLowerCase() === email)) ev.addGuest(email);
     });
   } catch (e) { Logger.log('calAddGuest_ ' + e); }
 }
@@ -819,7 +826,7 @@ function dailyReminder() {
       const mem = members.filter(k => k.ID === s.MemberID)[0];
       if (!mem || !mem.Email) return;
       try {
-        MailApp.sendEmail({
+        mail_({
           to: mem.Email, name: 'Marathon Members', subject: '⏰ Tomorrow: ' + m.Title,
           htmlBody: '<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6">Hi ' + mem.Name.split(' ')[0] + ' 👋<br><br>' +
             'Reminder: you are serving <b>tomorrow</b> in <b>' + m.Title + '</b>.<br>📅 ' + m.Date + (m.Location ? '<br>📍 ' + m.Location : '') +
