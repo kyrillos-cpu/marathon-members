@@ -782,12 +782,51 @@ function contactRow(c){
 }
 const APPROVED=['Confirmed','Attended','Signed'];
 function sgCounts(id){ const l=S.signups.filter(x=>x.MissionID===id); return {ok:l.filter(x=>APPROVED.includes(x.Status)).length, pending:l.filter(x=>x.Status==='Pending').length}; }
-function decisionWa(mem, m, status){
+function decisionWa(mem, m, status, reason){
   const f=(mem.Name||'').split(' ')[0];
-  const t= status==='Declined' ? `Hi ${f} 👋 thank you for signing up for ${m.Title} 🙏 This time the team is complete — we'll count on you in the next mission!`
+  const t= status==='Declined' ? (reason ? `Hi ${f} 👋 thank you for signing up for ${m.Title} 🙏\nSorry, we can't confirm you this time:\n${reason}\n\nWe hope to count on you in the next mission 🤍`
+      : `Hi ${f} 👋 thank you for signing up for ${m.Title} 🙏 This time the team is complete — we'll count on you in the next mission!`)
     : `Hi ${f} 👋 you're confirmed for ${m.Title} ✅\n📅 ${fmtD(m.Date)}${m.Location?'\n📍 '+m.Location:''}\n\nDetails: ${joinUrl()}`;
   return waLink(mem.Phone, t);
 }
+/* ---- Sunday-meeting check on sign-up requests ---- */
+function sunStat(memId){
+  const mem=S.members.find(x=>x.ID===memId)||{}; const t=todayStr(), jd=String(mem.JoinDate||'').slice(0,10);
+  const suns=S.sessions.filter(x=>x.Type==='Sunday Meeting'&&x.Date&&x.Date<=t&&(!jd||jd<=x.Date)).sort((a,b)=>a.Date<b.Date?1:-1).slice(0,4);
+  const came={}; S.attendance.forEach(a=>{ if(a.MemberID===memId&&(!a.Status||a.Status==='Present'||a.Status==='Late')) came[a.SessionID]=1; });
+  let streak=0; for(const x of suns){ if(came[x.ID]) break; streak++; }
+  const missed=suns.filter(x=>!came[x.ID]).length;
+  return {of:suns.length, missed, streak, flag:suns.length>=2&&(streak>=2||missed>=3)};
+}
+function sunBadge(st){ if(!st||!st.flag) return ''; return `<div class="small" style="color:var(--err);font-weight:700">⚠️ Sunday meeting: missed ${st.missed} of last ${st.of}${st.streak>=2?` (last ${st.streak} in a row)`:''}</div>`; }
+function sunReason(st){ return st&&st.flag?`You haven't been coming to the Sunday meeting lately (missed ${st.missed} of the last ${st.of}). Being with us on Sundays is required to join missions 🙏`:''; }
+let DECL=null;
+function declineForm(mid, memId, lead){
+  const m=lead?PAPPR.find(x=>x.ID===mid):S.missions.find(x=>x.ID===mid);
+  const p=lead?m.people.find(x=>x.MemberID===memId):S.members.find(x=>x.ID===memId);
+  const st=lead?p.Sun:sunStat(memId);
+  DECL={mid,memId,lead,m,mem:{Name:p.Name,Phone:p.Phone}};
+  const html=`${mhead('Decline · '+esc(p.Name))}
+    <div class="sub">${esc(m.Title)} · ${fmtD(m.Date,false)}</div>${sunBadge(st)}
+    <label class="f mt12">Reason (written to the servant before sending)</label>
+    <textarea class="in" id="declReason" rows="4" dir="auto" oninput="declPreview()" placeholder="Leave empty → “this time the team is complete”">${esc(sunReason(st))}</textarea>
+    <div class="small muted mt8">Message preview</div><div id="declPrev" class="card mt8" style="white-space:pre-wrap;background:#f0fdf4;font-size:14px"></div>
+    ${p.Phone?`<button class="btn danger block big mt12" onclick="declineSend(this,true)">✕ Decline &amp; send on WhatsApp</button>`:''}
+    <button class="btn ghost block mt8" onclick="declineSend(this,false)">Decline without a message</button>`;
+  if(lead){ $('#modalRoot').innerHTML=`<div class="ov" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`; } else modal(html);
+  declPreview();
+}
+function declText(){ const r=$('#declReason').value.trim(); const u=decisionWa(DECL.mem, DECL.m, 'Declined', r); return decodeURIComponent(u.split('text=')[1]); }
+function declPreview(){ $('#declPrev').textContent=declText(); }
+async function declineSend(b, wa){
+  const d=DECL, reason=$('#declReason').value.trim();
+  const link= wa ? decisionWa(d.mem, d.m, 'Declined', reason) : null;
+  if(link) window.open(link,'_blank');   // open first so the phone doesn't block it
+  if(d.lead){ PAPPR=await run(b,()=>api('decide',{key:ME.ID,MissionID:d.mid,MemberID:d.memId,Status:'Declined'},false)); closeModal(); renderJoin(); }
+  else { await setSignup(d.mid, d.memId, 'Declined'); closeModal(); render(); }
+  toast('Declined','ok');
+}
+
 function pendingList(){ const t=todayStr(); return S.signups.filter(x=>x.Status==='Pending').map(x=>({x, m:S.missions.find(y=>y.ID===x.MissionID), mem:S.members.find(y=>y.ID===x.MemberID)})).filter(o=>o.m&&o.mem&&(o.m.EndDate||o.m.Date)>=t).sort((a,b)=>a.m.Date<b.m.Date?-1:1); }
 async function quickDecide(mid, memId, status){ await setSignup(mid, memId, status); const m=S.missions.find(x=>x.ID===mid), mem=S.members.find(x=>x.ID===memId); if(mem&&mem.Phone&&confirm(`Send ${mem.Name.split(' ')[0]} a WhatsApp message?`)) window.open(decisionWa(mem,m,status),'_blank'); }
 function missionRow(m){
@@ -859,8 +898,8 @@ function openMission(id){
   ${m.Notes?`<div class="small muted mt8">${esc(m.Notes)}</div>`:''}
   <h3 class="mt16">Signed up (${sg.length}${m.SlotsNeeded?' / '+m.SlotsNeeded+' needed':''})</h3>
   <div class="small muted">Confirmed: <b>${nConf}</b> · Waiting for approval: <b>${nWait}</b></div>
-  <div class="list">${sg.map(({x,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">Score <b>${(SC[mem.ID]||{}).score??'—'}</b>${x.Team?' · '+esc(x.Team):''}${x.Note?' · '+esc(x.Note):''}</div></div>
-    ${x.Status==='Pending'?`<button class="btn sm ok" onclick="quickDecide('${id}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="quickDecide('${id}','${mem.ID}','Declined')">✕</button>`
+  <div class="list">${sg.map(({x,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">Score <b>${(SC[mem.ID]||{}).score??'—'}</b>${x.Team?' · '+esc(x.Team):''}${x.Note?' · '+esc(x.Note):''}</div>${x.Status==='Pending'?sunBadge(sunStat(mem.ID)):''}</div>
+    ${x.Status==='Pending'?`<button class="btn sm ok" onclick="quickDecide('${id}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="declineForm('${id}','${mem.ID}')">✕</button>`
       :`<select class="in" style="width:auto;padding:6px" onchange="setSignup('${id}','${mem.ID}',this.value)">${Array.from(new Set(['Pending','Confirmed','Declined','Attended','No-show',x.Status,'Removed'])).map(s=>`<option ${x.Status===s?'selected':''}>${s}</option>`).join('')}</select>`}</div>`).join('')||'<div class="sub">No one yet</div>'}</div>
   ${(()=>{ const cl=(S.cancellations||[]).filter(c=>c.MissionID===id).sort((a,b)=>a.CancelledAt<b.CancelledAt?1:-1); return cl.length?`<h3 class="mt16" style="color:var(--err)">Cancelled (${cl.length})</h3><div class="list">${cl.map(c=>cancelRow(c,false)).join('')}</div>`:''; })()}
   <div class="row mt8"><select class="in grow" id="addSg"><option value="">+ Add a servant…</option>${notIn.map(mm=>`<option value="${mm.ID}">${esc(mm.Name)}</option>`).join('')}</select><button class="btn sm" onclick="if($('#addSg').value)setSignup('${id}',$('#addSg').value,'Confirmed',true)">Add</button></div>
@@ -1115,8 +1154,8 @@ async function seenCancels(b){ const r=await run(b,()=>api('seenCancellations',{
 function pendingCard(){
   const l=pendingList(); if(!l.length) return '';
   return `<div class="card" style="border-left:4px solid #eab308"><h3>⏳ Waiting for approval <span class="badge">${l.length}</span></h3><div class="list">
-  ${l.slice(0,15).map(({x,m,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">${esc(m.Title)} · ${fmtD(m.Date,false)} · Score ${(SC[mem.ID]||{}).score??'—'}</div></div>
-    <button class="btn sm ok" onclick="quickDecide('${m.ID}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="quickDecide('${m.ID}','${mem.ID}','Declined')">✕</button></div>`).join('')}</div></div>`;
+  ${l.slice(0,15).map(({x,m,mem})=>`<div class="it" style="cursor:default">${avatar(mem)}<div class="grow"><div class="nm">${esc(mem.Name)}</div><div class="sub">${esc(m.Title)} · ${fmtD(m.Date,false)} · Score ${(SC[mem.ID]||{}).score??'—'}</div>${sunBadge(sunStat(mem.ID))}</div>
+    <button class="btn sm ok" onclick="quickDecide('${m.ID}','${mem.ID}','Confirmed')">✓</button><button class="btn sm danger" onclick="declineForm('${m.ID}','${mem.ID}')">✕</button></div>`).join('')}</div></div>`;
 }
 function annCard(){
   const list=annActive();
@@ -1244,8 +1283,8 @@ function joinAppr(){
   return PAPPR.map(m=>{ const pend=m.people.filter(p=>p.Status==='Pending').length, ok=m.people.filter(p=>['Confirmed','Signed','Attended'].includes(p.Status)).length;
     return `<div class="card mission ${esc(m.Type)}"><div class="row between"><span class="tag">${esc(m.Type)}</span><span class="small"><b>${ok}</b>${m.SlotsNeeded?' / '+esc(m.SlotsNeeded):''} confirmed${pend?` · <b style="color:#854d0e">${pend} waiting</b>`:''}</span></div>
     <div class="nm mt8" style="font-size:16px;white-space:normal">${esc(m.Title)}</div><div class="sub">📅 ${fmtD(m.Date)}${m.Location?' · 📍 '+esc(m.Location):''}</div>
-    <div class="list mt8">${m.people.slice().sort((a,b)=>(ord[a.Status]??1)-(ord[b.Status]??1)).map(p=>`<div class="it" style="cursor:default"><div class="grow"><div class="nm" style="white-space:normal">${esc(p.Name)}</div><div class="sub">${esc(p.Teams||'')}</div></div>
-      ${p.Status==='Pending'?`<button class="btn sm ok" onclick="leadDecide('${m.ID}','${p.MemberID}','Confirmed',this)">✓</button><button class="btn sm danger" onclick="leadDecide('${m.ID}','${p.MemberID}','Declined',this)">✕</button>`
+    <div class="list mt8">${m.people.slice().sort((a,b)=>(ord[a.Status]??1)-(ord[b.Status]??1)).map(p=>`<div class="it" style="cursor:default"><div class="grow"><div class="nm" style="white-space:normal">${esc(p.Name)}</div><div class="sub">${esc(p.Teams||'')}</div>${p.Status==='Pending'?sunBadge(p.Sun):''}</div>
+      ${p.Status==='Pending'?`<button class="btn sm ok" onclick="leadDecide('${m.ID}','${p.MemberID}','Confirmed',this)">✓</button><button class="btn sm danger" onclick="declineForm('${m.ID}','${p.MemberID}',true)">✕</button>`
         :`<span class="pill p-${p.Status}">${p.Status}</span>${p.Phone?`<a class="btn sm ghost" target="_blank" href="${decisionWa(p,m,p.Status)}">💬</a>`:''}`}</div>`).join('')||'<div class="sub">No requests yet.</div>'}</div></div>`; }).join('') || '<div class="card empty">No upcoming missions.</div>';
 }
 async function leadDecide(mid, memId, status, b){ PAPPR=await run(b,()=>api('decide',{key:ME.ID,MissionID:mid,MemberID:memId,Status:status},false)); renderJoin(); toast(status==='Confirmed'?'Confirmed ✓':'Declined','ok'); }

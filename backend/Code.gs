@@ -434,6 +434,16 @@ function signup_(d) {
   upsert_('Signups', r => r.MissionID === mission.ID && r.MemberID === m.ID, {
     MissionID: mission.ID, MemberID: m.ID, Team: d.Team || splitList_(m.Teams)[0] || '', Status: status, SignedAt: now_(), Note: d.Note || ''
   });
+  try {
+    const st = sundayStats_(m.ID, m.JoinDate);
+    if (st.flag) {
+      const to = Session.getEffectiveUser().getEmail();
+      if (to) MailApp.sendEmail({ to: to, subject: '⚠️ ' + m.Name + ' requested ' + mission.Title + ' — missed Sunday meetings',
+        body: m.Name + ' (' + (m.Phone || m.ID) + ') requested to join:\n' + mission.Title + ' · ' + mission.Date +
+          '\n\nSunday meeting: missed ' + st.missed + ' of the last ' + st.of + (st.streak >= 2 ? ' (the last ' + st.streak + ' in a row)' : '') +
+          '.\n\nOpen the app to approve or decline.' });
+    }
+  } catch (e) { Logger.log(e); }
   return { Status: status };
 }
 function cancelSignup_(d) {
@@ -919,16 +929,28 @@ function checkApprover_(d) {
   if (!m || m.Status === 'Inactive' || !isApprover_(m)) throw new Error('Only the team lead can approve');
   return m;
 }
+/** Sunday-meeting attendance of one member over the last 4 meetings. */
+function sundayStats_(memberId, joinDate, sessions, att) {
+  const t = today_();
+  sessions = sessions || readTable_('Sessions'); att = att || readTable_('Attendance');
+  const suns = sessions.filter(x => x.Type === 'Sunday Meeting' && x.Date && x.Date <= t && (!joinDate || String(joinDate).slice(0, 10) <= x.Date))
+    .sort((a, b) => a.Date < b.Date ? 1 : -1).slice(0, 4);
+  const came = {}; att.forEach(a => { if (a.MemberID === memberId && (a.Status === 'Present' || a.Status === 'Late' || !a.Status)) came[a.SessionID] = 1; });
+  let streak = 0; for (const x of suns) { if (came[x.ID]) break; streak++; }
+  const missed = suns.filter(x => !came[x.ID]).length;
+  return { of: suns.length, missed: missed, streak: streak, flag: suns.length >= 2 && (streak >= 2 || missed >= 3) };
+}
 function approvals_(d) {
   checkApprover_(d);
   const t = today_();
   const members = readTable_('Members'), signups = readTable_('Signups');
+  const sessions = readTable_('Sessions'), att = readTable_('Attendance');
   return readTable_('Missions').filter(m => m.Status !== 'Cancelled' && (m.EndDate || m.Date) >= t)
     .sort((a, b) => a.Date < b.Date ? -1 : 1)
     .map(m => ({ ID: m.ID, Title: m.Title, Type: m.Type, Date: m.Date, EndDate: m.EndDate, Location: m.Location, SlotsNeeded: m.SlotsNeeded,
       people: signups.filter(s => s.MissionID === m.ID && ['Cancelled'].indexOf(s.Status) < 0).map(s => {
         const x = members.filter(k => k.ID === s.MemberID)[0] || {};
-        return { MemberID: s.MemberID, Name: x.Name || s.MemberID, Phone: x.Phone || '', Teams: x.Teams || '', Status: s.Status, SignedAt: s.SignedAt };
+        return { MemberID: s.MemberID, Name: x.Name || s.MemberID, Phone: x.Phone || '', Teams: x.Teams || '', Status: s.Status, SignedAt: s.SignedAt, Sun: s.Status === 'Pending' ? sundayStats_(s.MemberID, x.JoinDate, sessions, att) : null };
       }) }));
 }
 function decide_(d) {
