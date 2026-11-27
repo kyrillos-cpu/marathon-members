@@ -982,7 +982,7 @@ function confMark(mid, memId){ const l=confSent(mid); if(!l.includes(memId)) l.p
 function copyConfGroup(id){
   const m=S.missions.find(x=>x.ID===id);
   const sg=S.signups.filter(x=>x.MissionID===id&&APPROVED.includes(x.Status)).map(x=>({x, mem:S.members.find(y=>y.ID===x.MemberID)})).filter(o=>o.mem);
-  copyText(`✅ Marathon mission — team confirmation\n\n${confDetails(m)}\n\n👥 The team:\n${sg.map((o,i)=>`${i+1}. ${o.mem.Name}${o.x.Team?' ('+o.x.Team+')':''}`).join('\n')}\n\nPlease reply ✅ to confirm you're coming 🙏`);
+  copyText(`✅ Marathon mission — team confirmation\n\n${confDetails(m)}\n\n👥 The team:\n${sg.map((o,i)=>`${i+1}. ${o.mem.Name}${o.mem.Phone?' – '+o.mem.Phone:''}${o.x.Team?' ('+o.x.Team+')':''}`).join('\n')}\n\nPlease reply ✅ to confirm you're coming 🙏`);
 }
 
 function announceText(m){
@@ -995,7 +995,8 @@ function announceAll(){
   return `📣 Open Marathon missions\n\n`+ms.map(m=>`⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.Location?' · 📍 '+m.Location:''}`).join('\n\n')+`\n\nSign up here 👇\n${joinUrl()}`;
 }
 function announceLink(id){ return 'https://wa.me/?text='+encodeURIComponent(announceText(S.missions.find(x=>x.ID===id))); }
-function copyMission(id){ const m=S.missions.find(x=>x.ID===id); const sg=S.signups.filter(x=>x.MissionID===id&&x.Status!=='Waitlist'); const lines=sg.map((x,i)=>`${i+1}. ${(S.members.find(y=>y.ID===x.MemberID)||{}).Name}${x.Team?' ('+x.Team+')':''}`);
+function copyMission(id){ const m=S.missions.find(x=>x.ID===id); const sg=S.signups.filter(x=>x.MissionID===id&&APPROVED.includes(x.Status)).map(x=>({x,mem:S.members.find(y=>y.ID===x.MemberID)||{}})).sort((a,b)=>String(a.mem.Name).localeCompare(String(b.mem.Name)));
+  const lines=sg.map(({x,mem},i)=>`${i+1}. ${mem.Name||x.MemberID}${mem.Phone?' – '+mem.Phone:''}${x.Team?' ('+x.Team+')':''}`);
   copyText(`⚑ ${m.Title}\n📅 ${fmtD(m.Date)}${m.EndDate&&m.EndDate!==m.Date?' → '+fmtD(m.EndDate):''}${m.Location?'\n📍 '+m.Location:''}\n\nTeam (${sg.length}):\n${lines.join('\n')}\n\nSign up: ${joinUrl()}`); }
 async function delMission(id){ if(!confirm('Delete this mission and its sign-ups?')) return; await run(null,()=>api('deleteMission',{ID:id})); S.missions=S.missions.filter(m=>m.ID!==id); S.signups=S.signups.filter(s=>s.MissionID!==id); closeModal(); render(); }
 
